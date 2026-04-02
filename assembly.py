@@ -75,8 +75,6 @@ def update_bom_table():
 
             raw_bom = assembly_api_call(assembly_wasp_num) # call wasp api for the assembly details
             bom = raw_bom["Data"]["ItemBillOfMaterials"] # drill into where the actual bom is in the json response
-            if assembly_num == 6420:
-                print(bom)
 
             for component in bom:
                 component_wasp = component["ItemNumber"]
