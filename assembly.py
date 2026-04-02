@@ -20,6 +20,7 @@ def assembly_api_call(assembly_number):
     print(assembly_details)
     return assembly_details
 
+# gets a list of all unique assembly numbers
 def get_all_assemblies(conn=None):
     if conn is None:
         conn = create_db_conn()
@@ -29,7 +30,12 @@ def get_all_assemblies(conn=None):
 
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT id from ")
+        cursor.execute("""SELECT DISTINCT ON (WASPNumber) id
+                            FROM items
+                            WHERE type = 'Assembly'
+                            ORDER BY WASPNumber, id DESC;
+                       """)
+        return [row[0] for row in cursor.fetchall()] # returns a list of all of the unique assemblies
     except Exception as e:
         print('Failed to get all assembly numbers', e)
     finally:
@@ -60,6 +66,7 @@ def update_bom_table():
         );
         """
         cursor.execute(create_bom)
+
 
 
         cursor.close()
