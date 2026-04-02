@@ -16,9 +16,9 @@ def assembly_api_call(assembly_number):
     }
 
     response = requests.request("POST", url, headers=headers, data=payload)
-    assembly_details = response.text
-    print(assembly_details)
-    return assembly_details
+    # assembly_details = response.text
+    # print(assembly_details)
+    return response.json()
 
 # gets a list of all unique assembly numbers
 def get_all_assemblies(conn=None):
@@ -67,7 +67,45 @@ def update_bom_table():
         """
         cursor.execute(create_bom)
 
+        assembly_numbers = get_all_assemblies(conn) #list of all assembly IDs
 
+        for assembly_num in assembly_numbers:
+            cursor.execute("SELECT WASPNumber FROM items WHERE id = %s", (assembly_num,)) #get waspnumber 
+            assembly_wasp_num = cursor.fetchone()[0]
+
+            raw_bom = assembly_api_call(assembly_wasp_num) # call wasp api for the assembly details
+            bom = raw_bom["Data"]["ItemBillOfMaterials"] # drill into where the actual bom is in the json response
+            if assembly_num == 6420:
+                print(bom)
+
+            for component in bom:
+                component_wasp = component["ItemNumber"]
+                quantity = component["Quantity"]
+                cost = component["Cost"]
+                scrap_on_disassembly = component["ScrapOnDisassembly"]
+
+                # get component id
+                cursor.execute(
+                    "SELECT id FROM items WHERE waspnumber = %s LIMIT 1;",
+                    (component_wasp,)
+                )
+                component_id = cursor.fetchone()[0]
+
+                # insert into bom table
+                # ON CONFLICT DO UPDATE SET is for if there are duplicate entries for an item in a bom (this can happen due to how WASP handles entering an item into a BOM that was already there)
+                cursor.execute(
+                    """
+                    INSERT INTO bom (parent_item_id, component_item_id, quantity, cost, scrap_on_disassembly)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (parent_item_id, component_item_id)
+                    DO UPDATE SET
+                        quantity = bom.quantity + EXCLUDED.quantity,
+                        cost = EXCLUDED.cost,
+                        scrap_on_disassembly = EXCLUDED.scrap_on_disassembly
+                    """,
+                    (assembly_num, component_id, quantity, cost, scrap_on_disassembly)
+                )
+        conn.commit()
 
         cursor.close()
         conn.close()
