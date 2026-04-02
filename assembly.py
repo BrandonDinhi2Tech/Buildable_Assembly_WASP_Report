@@ -20,10 +20,21 @@ def assembly_api_call(assembly_number):
     print(assembly_details)
     return assembly_details
 
-# def get_all_assemblies():
-#     try:
-#         conn = create_db_conn()
-#         cursor = conn.cursor()
+def get_all_assemblies(conn=None):
+    if conn is None:
+        conn = create_db_conn()
+        close_after = True
+    else:
+        close_after = False
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id from ")
+    except Exception as e:
+        print('Failed to get all assembly numbers', e)
+    finally:
+        if close_after:
+            conn.close()
 
 #make/update assembly table containing all of the assemblies
 def update_bom_table():
@@ -40,12 +51,12 @@ def update_bom_table():
         # so if for example one item is in multiple assemblies, it will have multiple entries in this table with different parent ids and potentially different costs
         create_bom = """
         CREATE TABLE bom (
-            id SERIAL PRIMARY KEY,
             parent_item_id INTEGER NOT NULL REFERENCES items(id),
             component_item_id INTEGER NOT NULL REFERENCES items(id),
             quantity NUMERIC NOT NULL,
             cost NUMERIC NOT NULL,
-            scrap_on_disassembly BOOLEAN DEFAULT FALSE
+            scrap_on_disassembly BOOLEAN DEFAULT FALSE,
+            PRIMARY KEY (parent_item_id, component_item_id)
         );
         """
         cursor.execute(create_bom)

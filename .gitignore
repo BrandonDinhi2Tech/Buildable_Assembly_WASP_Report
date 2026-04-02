@@ -1,2 +1,5 @@
 item_list_filtered.csv
 item_list.csv
+item_list_flat.csv
+item_list_unique.csv
+__pycache__
