@@ -4,6 +4,7 @@ import json
 import pandas as pd
 import time
 
+# TODO: Get rid of the intermediate item_list.csv creation, should be able to go straight from json to postgresql
 # requests the entire inventory from WASP and puts it into a csv
 # use streamgridrequestcsvflat if you want info on individual items i.e. serial number, location
 def entire_inventory_api_call(csv_name):
@@ -60,7 +61,8 @@ def inventory_to_database(csv_name):
     # filter fields
     items_filtered = items[['WASPNumber', 'Type', 'Description', 'CostMethod', 'Cost',
                             'Manufacturer', 'Category', 'StockingUnit', 'AlternateNumber',
-                            'OnOrder', 'CommittedQty', 'SerialNumber', 'TotalAvailable',
+                            'OnOrder', 'CommittedQty', 'SerialNumber','LocationCode',
+                            'SiteName', 'TotalAvailable',
                             'TotalCheckedOut', 'TotalInHouse',
                             'PartDrawingNumber', 'PartDrawingDescription']].copy()
 
@@ -87,7 +89,7 @@ def inventory_to_database(csv_name):
         cursor = conn.cursor()
 
         # Drop table if exists
-        cursor.execute("DROP TABLE IF EXISTS Items")
+        cursor.execute("DROP TABLE IF EXISTS Items CASCADE")
 
         # id is the primary key since WASPNumber can be the same for multiple entries
         create_item = """
@@ -105,6 +107,8 @@ def inventory_to_database(csv_name):
             OnOrder INTEGER,
             CommittedQty INTEGER,
             SerialNumber VARCHAR(64),
+            LocationCode TEXT,
+            SiteName TEXT,
             TotalAvailable INTEGER,
             TotalCheckedOut INTEGER,
             TotalInHouse INTEGER,
@@ -131,6 +135,8 @@ def inventory_to_database(csv_name):
                     OnOrder,
                     CommittedQty,
                     SerialNumber,
+                    LocationCode,
+                    SiteName,
                     TotalAvailable,
                     TotalCheckedOut,
                     TotalInHouse,

@@ -1,8 +1,11 @@
 import item
 import assembly
+import location
 
 
 if __name__ == "__main__":
+    location.update_location_table()
     item.entire_inventory_api_call('item_list.csv')
     item.inventory_to_database('item_list.csv')
     assembly.update_bom_table()
+    

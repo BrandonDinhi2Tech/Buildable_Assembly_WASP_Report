@@ -1,7 +1,6 @@
 from db import create_db_conn
 import requests
 import json
-import pandas as pd
 
 #requests WASP for the details of an assembly
 def assembly_api_call(assembly_number):
