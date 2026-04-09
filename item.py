@@ -35,7 +35,7 @@ def entire_inventory_api_call(csv_name):
         file.write(csv_data)
 
 def inventory_to_database(csv_name):
-    start_time = time.perf_counter()
+    #start_time = time.perf_counter()
 
     # prepare csv file from WASP for insertion
     items = pd.read_csv(csv_name)
@@ -151,9 +151,9 @@ def inventory_to_database(csv_name):
 
         conn.commit()
 
-        end_time = time.perf_counter()
-        elapsed_time = end_time - start_time
-        print(f"Execution time: {elapsed_time:.4f} seconds")
+        # end_time = time.perf_counter()
+        # elapsed_time = end_time - start_time
+        # print(f"Execution time: {elapsed_time:.4f} seconds")
         print("Items Imported")
 
         cursor.close()

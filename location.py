@@ -51,7 +51,7 @@ def update_location_table():
             )
             for location in all_location_api_response.get("Data", [])
         ]
-        print(rows)
+        #print(rows)
 
         execute_values(
             cursor,
