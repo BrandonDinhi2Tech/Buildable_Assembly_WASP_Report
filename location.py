@@ -67,6 +67,9 @@ def update_location_table():
 
         conn.commit()
 
+        cursor.close()
+        conn.close()
+
     except Exception as e:
         print('Failed location table update', e)
 
