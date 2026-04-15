@@ -9,3 +9,5 @@ Install pyinstaller: pip install -U pyinstaller
 
 Run this command in the install directory: pyinstaller --onefile --noconsole main.py
 
+Make sure to have a .env file in the same directory as the .exe
+
