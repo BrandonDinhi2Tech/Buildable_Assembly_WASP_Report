@@ -41,6 +41,35 @@ def get_all_assemblies(conn=None):
         if close_after:
             conn.close()
 
+# gets a concatenation of the wasp number of an assembly and its description for the 
+def get_assy_wasp_and_desc(conn=None):
+    if conn is None:
+        conn=create_db_conn()
+        close_after = True
+    else:
+        close_after = False
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+                        SELECT DISTINCT waspnumber, description
+                        FROM items
+                        WHERE type = 'Assembly'
+                        ORDER BY waspnumber;
+                    """)
+        rows = cursor.fetchall()
+
+        assembly_list = [
+            {"waspnumber": row[0], "description": row[1]}
+        for row in rows
+        ]
+
+        return assembly_list
+        
+    finally:
+        if close_after:
+            conn.close()
+
 #make/update assembly table containing all of the assemblies
 def update_bom_table():
     try:

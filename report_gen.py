@@ -152,7 +152,7 @@ def create_report(assembly_num, contract, include_inspection=False, include_on_o
         # adding all additional parameters to output file name as well as the file extension and the datetime of creation
         if add_to_output_file_name == True:
             output_file_name += output_file_name_addition
-            output_file_name += f" {datetime.now().strftime("%Y-%m-%d")}.xlsx"
+            output_file_name += f" {datetime.now().strftime("%Y-%m-%d_%H%M%S")}.xlsx"
 
         get_report += """
                     FROM bom b
@@ -231,7 +231,7 @@ def create_report(assembly_num, contract, include_inspection=False, include_on_o
         # output sql query to excel spreadsheet
         with pd.ExcelWriter(output_file_name, engine="openpyxl") as writer:
             ws = writer.book.create_sheet(title="Title Page")
-            ws.cell(row=1, column=1, value="WASP Buildable Report")
+            ws.cell(row=1, column=1, value=f"WASP Buildable Report {output_file_name_addition}")
             ws.cell(row=2, column=1, value=f"BOM: {assembly_num}")
             ws.cell(row=3, column=1, value=f"Desc: {assembly_description}")
             ws.cell(row=4, column=1, value=f"Buildable Units: {assembly_buildable}")
@@ -244,12 +244,15 @@ def create_report(assembly_num, contract, include_inspection=False, include_on_o
 
             target_header = "Available-Desired Quantity"
 
+            # trying to find available-desired quantity column
             col_idx = None
             for cell in ws[1]:
                 if cell.value == target_header:
                     col_idx = cell.column
                     break
 
+            # highlighting all items that are short of meeting the desired amount
+            # these items will show up as negative
             if col_idx:
                 col_letter = get_column_letter(col_idx)
                 max_row = len(df) + 1
