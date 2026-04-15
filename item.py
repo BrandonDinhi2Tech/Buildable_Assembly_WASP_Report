@@ -2,7 +2,6 @@ from db import create_db_conn
 import requests
 import json
 import pandas as pd
-import time
 
 # TODO: Get rid of the intermediate item_list.csv creation, should be able to go straight from json to postgresql
 # requests the entire inventory from WASP and puts it into a csv

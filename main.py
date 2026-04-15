@@ -4,6 +4,7 @@ import location
 import report_gen
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
+import os
 
 class BuildableAssemblyWaspReportGenerator:
     list_of_contracts = ['RGI35', 'QIN05', 'QIN11', 'General'] # list of contracts
@@ -120,19 +121,25 @@ class BuildableAssemblyWaspReportGenerator:
             return
         else:
             waspnumber = self.assembly_list[index]['waspnumber']
+
+        # falling back to current directory if output directory isn't chosen by user
+        output_dir = self.output_folder.get()
+        if not output_dir:
+            output_dir = os.getcwd()
+
         if self.desired_amount == 0:
             report_gen.create_report(assembly_num=waspnumber, 
                                      contract=self.contract_combobox.get(), 
                                      include_inspection=self.include_inspection.get(), 
                                      include_cost=self.include_cost.get(),
-                                     output_directory=self.output_folder.get())
+                                     output_directory=output_dir)
         else:
             report_gen.create_report(assembly_num=waspnumber, 
                                      contract=self.contract_combobox.get(), 
                                      include_inspection=self.include_inspection.get(), 
                                      include_cost=self.include_cost.get(), 
                                      desired_amount=self.desired_amount.get(),
-                                     output_directory=self.output_folder.get())
+                                     output_directory=output_dir)
         
 
 if __name__ == "__main__":
