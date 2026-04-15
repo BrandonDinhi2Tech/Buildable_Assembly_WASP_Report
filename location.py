@@ -41,7 +41,7 @@ def update_location_table():
         """
         cursor.execute(create_locations)
 
-        # get all of the 
+        # get all of the locations
         all_location_api_response = location_api_call()
         rows = [
             (

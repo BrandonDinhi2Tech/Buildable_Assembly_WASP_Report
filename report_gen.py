@@ -4,14 +4,15 @@ from datetime import datetime
 from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
+import os
 
 
 # this function is to generate the report in a spreadsheet for the user to review
-# takes into account the assembly number and the contract that the program should calculate inventory from
+# takes into account the assembly's WASP number and the contract that the program should calculate inventory from
 # also takes into account whether or not inspection and/or on-order quantities should be in the buildable amount calculation
 # also has option for sanitizing item costs from the report
 # also has an option for inputting a desired amount of units to see how available inventory compares to the desired amount
-def create_report(assembly_num, contract, include_inspection=False, include_on_order=False, include_cost=False, desired_amount=None):
+def create_report(assembly_num, contract, output_directory, include_inspection=False, include_on_order=False, include_cost=False, desired_amount=None):
     # assembly_cat = None
     # try:
     #     conn = create_db_conn()
@@ -153,6 +154,9 @@ def create_report(assembly_num, contract, include_inspection=False, include_on_o
         if add_to_output_file_name == True:
             output_file_name += output_file_name_addition
             output_file_name += f" {datetime.now().strftime("%Y-%m-%d_%H%M%S")}.xlsx"
+        
+        if output_directory:
+            full_path = os.path.join(output_directory, output_file_name)
 
         get_report += """
                     FROM bom b
@@ -229,7 +233,7 @@ def create_report(assembly_num, contract, include_inspection=False, include_on_o
         assembly_description = cursor.fetchone()[0]
 
         # output sql query to excel spreadsheet
-        with pd.ExcelWriter(output_file_name, engine="openpyxl") as writer:
+        with pd.ExcelWriter(full_path, engine="openpyxl") as writer:
             ws = writer.book.create_sheet(title="Title Page")
             ws.cell(row=1, column=1, value=f"WASP Buildable Report {output_file_name_addition}")
             ws.cell(row=2, column=1, value=f"BOM: {assembly_num}")
