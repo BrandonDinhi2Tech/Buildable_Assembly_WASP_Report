@@ -1,7 +1,7 @@
 ## Prerequisites
 - Python 3.13.12 (tested only on this, not sure about further compatibility)
 - A running PostgreSQL server (developed on version 18.3)
-- Create a database and user, then configure connection details in .env
+- Create a database and user, then configure connection details in .env (follow format of .env.example)
 
 To build an exe:
 
