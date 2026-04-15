@@ -2,6 +2,8 @@ import psycopg2
 from dotenv import load_dotenv
 import os
 
+load_dotenv()
+
 def create_db_conn():
     cnx = psycopg2.connect(
         host=os.getenv("DB_HOST", "localhost"),
