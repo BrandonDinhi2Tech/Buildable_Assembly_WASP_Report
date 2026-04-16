@@ -9,6 +9,7 @@ import os
 class BuildableAssemblyWaspReportGenerator:
     list_of_contracts = ['RGI35', 'QIN05', 'QIN11', 'General'] # list of contracts
     def __init__(self, root):
+        self.refresh_database(refresh_combobox=False)
         self.root = root
         self.root.minsize(800, 600)
         self.root.title("Buildable Assembly WASP Report Generator")
@@ -76,7 +77,7 @@ class BuildableAssemblyWaspReportGenerator:
         self.browse_output_folder_button.grid(row=6, column=2, padx=2)
 
         #row 7
-        self.refresh_database_button = ttk.Button(mainframe, text="Refresh Database (connect to i2TechInventory WiFi before clicking)", command=self.refresh_database)
+        self.refresh_database_button = ttk.Button(mainframe, text="Refresh Database (connect to i2TechInventory WiFi before clicking)", command=lambda: self.refresh_database(refresh_combobox=True))
         self.refresh_database_button.grid(row=7, column=0, columnspan=3)
 
         #row 8
@@ -90,25 +91,26 @@ class BuildableAssemblyWaspReportGenerator:
         if folder_selected:
             self.output_folder.set(folder_selected)
 
-    def refresh_database(self):
+    def refresh_database(self, refresh_combobox):
         try:
             location.update_location_table()
             item.entire_inventory_api_call('item_list.csv')
             item.inventory_to_database('item_list.csv')
             assembly.update_bom_table()
             
-            # refresh the assembly combobox with the up to date values
-            try:
-                self.assembly_list = assembly.get_assy_wasp_and_desc()
-                display_values = [
-                    f"{a['waspnumber']} - {a['description']}"
-                for a in self.assembly_list
-                ]
-            except Exception as e:
-                messagebox.showerror("Failed getting assembly list", str(e))
-            self.assembly_combobox['values'] = display_values
-            if self.assembly_list:
-                self.assembly_combobox.current(0)
+            if refresh_combobox:
+                # refresh the assembly combobox with the up to date values
+                try:
+                    self.assembly_list = assembly.get_assy_wasp_and_desc()
+                    display_values = [
+                        f"{a['waspnumber']} - {a['description']}"
+                    for a in self.assembly_list
+                    ]
+                except Exception as e:
+                    messagebox.showerror("Failed getting assembly list", str(e))
+                self.assembly_combobox['values'] = display_values
+                if self.assembly_list:
+                    self.assembly_combobox.current(0)
 
             messagebox.showinfo(title='Database Refresh', message='Refreshed database successfully!')
         except Exception as e:
