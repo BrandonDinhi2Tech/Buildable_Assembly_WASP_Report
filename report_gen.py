@@ -29,10 +29,10 @@ def create_report(assembly_num, contract, output_directory, include_inspection=F
                         """, (assembly_num,))
         assembly_id = cursor.fetchone()[0] 
         #print("assembly_id:", assembly_id)
-        cursor.execute(
-            "SELECT * FROM bom WHERE parent_item_id = %s",
-            (assembly_id,)
-        )
+        # cursor.execute(
+        #     "SELECT * FROM bom WHERE parent_item_id = %s",
+        #     (assembly_id,)
+        # )
         #print("bom rows:", cursor.fetchall())
         get_report = """
                             SELECT
@@ -44,7 +44,8 @@ def create_report(assembly_num, contract, output_directory, include_inspection=F
                                 b.quantity AS "Quantity in BOM",
                                 COALESCE(inv.totalavailable, 0) AS "Available Quantity In Contract's Stock",
                                 COALESCE(inspection.totalavailable, 0) AS "Quantity Pending Inspection",
-                                COALESCE(comp_master.onorder, 0) AS "Quantity on Order"
+                                COALESCE(comp_master.onorder, 0) AS "Quantity on Order",
+                                COALESCE(kit.totalavailable, 0) AS "Quantity Kitted for Contract"
                             """
         params = [] # this will hold all of the %s params for the sql execution later
         output_file_name = f"{assembly_num} Report for {contract}" # this will be the output file name which changes based on the parameters of the report
@@ -68,7 +69,7 @@ def create_report(assembly_num, contract, output_directory, include_inspection=F
             get_report += """
                             ,
                             COALESCE(inv.totalavailable, 0) + COALESCE(inspection.totalavailable, 0) AS "Available Quantity Including Items Pending Inspection",
-                            FLOOR(COALESCE(inv.totalavailable, 0) + COALESCE(inspection.totalavailable, 0) / b.quantity) AS "Buildable Amount"
+                            FLOOR((COALESCE(inv.totalavailable, 0) + COALESCE(inspection.totalavailable, 0)) / b.quantity) AS "Buildable Amount"
                         """
             output_file_name_addition += " Inspection"
             add_to_output_file_name = True
@@ -86,7 +87,7 @@ def create_report(assembly_num, contract, output_directory, include_inspection=F
             get_report += """
                             ,
                             COALESCE(inv.totalavailable, 0) + COALESCE(comp_master.onorder, 0) AS "Available Quantity Including Items On Order",
-                            FLOOR(COALESCE(inv.totalavailable, 0) + COALESCE(comp_master.onorder, 0) / b.quantity) AS "Buildable Amount"
+                            FLOOR((COALESCE(inv.totalavailable, 0) + COALESCE(comp_master.onorder, 0)) / b.quantity) AS "Buildable Amount"
                         """
             output_file_name_addition += " On-Order"
             add_to_output_file_name = True
@@ -104,7 +105,7 @@ def create_report(assembly_num, contract, output_directory, include_inspection=F
             get_report += """
                             ,
                             COALESCE(inv.totalavailable, 0) + COALESCE(comp_master.onorder, 0) + COALESCE(inspection.totalavailable, 0) AS "Available Quantity Including Items On Order and Pending Inspection",
-                            FLOOR(COALESCE(inv.totalavailable, 0) + COALESCE(comp_master.onorder, 0) + COALESCE(inspection.totalavailable, 0) / b.quantity) AS "Buildable Amount"
+                            FLOOR((COALESCE(inv.totalavailable, 0) + COALESCE(comp_master.onorder, 0) + COALESCE(inspection.totalavailable, 0)) / b.quantity) AS "Buildable Amount"
                         """
             output_file_name_addition += " Inspection and On-Order"
             add_to_output_file_name = True
@@ -172,6 +173,15 @@ def create_report(assembly_num, contract, output_directory, include_inspection=F
                     ) inspection
                         ON inspection.waspnumber = comp_master.waspnumber
 
+                    -- aggregate kitted first
+                    LEFT JOIN (
+                        SELECT waspnumber, SUM(totalavailable) AS totalavailable
+                        FROM items
+                        WHERE locationcode LIKE ANY(%s)
+                        GROUP BY waspnumber
+                    ) kit
+                        ON kit.waspnumber = comp_master.waspnumber
+
                     WHERE parent.id = %s
 
                     GROUP BY
@@ -184,7 +194,8 @@ def create_report(assembly_num, contract, output_directory, include_inspection=F
                         comp_master.category,
                         inv.totalavailable,
                         comp_master.onorder,
-                        inspection.totalavailable
+                        inspection.totalavailable,
+                        kit.totalavailable
 
                     ORDER BY comp_master.waspnumber;
                     """
@@ -194,18 +205,22 @@ def create_report(assembly_num, contract, output_directory, include_inspection=F
         match contract:
             case 'RGI35':
                 params.append('RGI35 i2Tech Stock')
+                params.append(['%RGI35%', '%LV-L01%'])
                 params.append(assembly_id)
                 df = pd.read_sql_query(get_report, conn, params=params)
             case 'QIN05':
                 params.append('QIN05-STK')
+                params.append(['%QIN05%'])
                 params.append(assembly_id)
                 df = pd.read_sql_query(get_report, conn, params=params)
             case 'QIN11':
                 params.append('QIN11-STK')
+                params.append(['%QIN11%'])
                 params.append(assembly_id)
                 df = pd.read_sql_query(get_report, conn, params=params)
             case 'General':
                 params.append('SiteA')
+                params.append(['%SiteA%'])
                 params.append(assembly_id)
                 df = pd.read_sql_query(get_report, conn, params=params)
             case _:
