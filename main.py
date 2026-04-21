@@ -129,19 +129,25 @@ class BuildableAssemblyWaspReportGenerator:
         if not output_dir:
             output_dir = os.getcwd()
 
-        if self.desired_amount == 0:
-            report_gen.create_report(assembly_num=waspnumber, 
-                                     contract=self.contract_combobox.get(), 
-                                     include_inspection=self.include_inspection.get(), 
-                                     include_cost=self.include_cost.get(),
-                                     output_directory=output_dir)
-        else:
-            report_gen.create_report(assembly_num=waspnumber, 
-                                     contract=self.contract_combobox.get(), 
-                                     include_inspection=self.include_inspection.get(), 
-                                     include_cost=self.include_cost.get(), 
-                                     desired_amount=self.desired_amount.get(),
-                                     output_directory=output_dir)
+        try:
+            if self.desired_amount == 0:
+                report_gen.create_report(assembly_num=waspnumber, 
+                                        contract=self.contract_combobox.get(), 
+                                        include_inspection=self.include_inspection.get(), 
+                                        include_cost=self.include_cost.get(),
+                                        output_directory=output_dir)
+            else:
+                report_gen.create_report(assembly_num=waspnumber, 
+                                        contract=self.contract_combobox.get(), 
+                                        include_inspection=self.include_inspection.get(), 
+                                        include_cost=self.include_cost.get(), 
+                                        desired_amount=self.desired_amount.get(),
+                                        output_directory=output_dir)
+            messagebox.showinfo(title='Generate Report', message=f"Generated report successfully at {output_dir}!")
+        except Exception as e:
+            messagebox.showerror('Failed to generate report', str(e))
+        
+
         
 
 if __name__ == "__main__":

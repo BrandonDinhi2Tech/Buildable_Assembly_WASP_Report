@@ -55,6 +55,7 @@ def create_report(assembly_num, contract, output_directory, include_inspection=F
                             SELECT
                                 parent.waspnumber AS "Assembly",
                                 comp_master.waspnumber AS "Component",
+                                comp_master.category AS "Component Category",
                                 comp_master.description AS "Component Description",
                                 comp_master.manufacturer AS "Component Manufacturer",
                                 b.quantity AS "Quantity in BOM",
@@ -197,6 +198,7 @@ def create_report(assembly_num, contract, output_directory, include_inspection=F
                         b.quantity,
                         comp_master.cost,
                         comp_master.manufacturer,
+                        comp_master.category,
                         inv.totalavailable,
                         inv.onorder,
                         inspection.totalavailable
