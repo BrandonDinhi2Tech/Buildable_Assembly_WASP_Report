@@ -13,23 +13,6 @@ import os
 # also has option for sanitizing item costs from the report
 # also has an option for inputting a desired amount of units to see how available inventory compares to the desired amount
 def create_report(assembly_num, contract, output_directory, include_inspection=False, include_on_order=False, include_cost=False, desired_amount=None):
-    # assembly_cat = None
-    # try:
-    #     conn = create_db_conn()
-    #     cursor = conn.cursor()
-
-    #     cursor.execute("""
-    #                     SELECT Category
-    #                     FROM items
-    #                     WHERE WASPNumber = %s
-    #                    """,
-    #                    (assembly_num,))
-    #     assembly_cat = cursor.fetchone()[0] # this determines which site we can pull from
-
-    #     cursor.close()
-    #     conn.close()
-    # except Exception as e:
-    #     print('Failed getting assembly category', e)
 
     # depending on the contract, the site that you can pull parts from changes
     try:
@@ -45,12 +28,12 @@ def create_report(assembly_num, contract, output_directory, include_inspection=F
                         LIMIT 1
                         """, (assembly_num,))
         assembly_id = cursor.fetchone()[0] 
-        print("assembly_id:", assembly_id)
+        #print("assembly_id:", assembly_id)
         cursor.execute(
             "SELECT * FROM bom WHERE parent_item_id = %s",
             (assembly_id,)
         )
-        print("bom rows:", cursor.fetchall())
+        #print("bom rows:", cursor.fetchall())
         get_report = """
                             SELECT
                                 parent.waspnumber AS "Assembly",
@@ -61,7 +44,7 @@ def create_report(assembly_num, contract, output_directory, include_inspection=F
                                 b.quantity AS "Quantity in BOM",
                                 COALESCE(inv.totalavailable, 0) AS "Available Quantity In Contract's Stock",
                                 COALESCE(inspection.totalavailable, 0) AS "Quantity Pending Inspection",
-                                COALESCE(inv.onorder, 0) AS "Quantity on Order"
+                                COALESCE(comp_master.onorder, 0) AS "Quantity on Order"
                             """
         params = [] # this will hold all of the %s params for the sql execution later
         output_file_name = f"{assembly_num} Report for {contract}" # this will be the output file name which changes based on the parameters of the report
@@ -102,15 +85,15 @@ def create_report(assembly_num, contract, output_directory, include_inspection=F
         elif include_inspection == False and include_on_order == True:
             get_report += """
                             ,
-                            COALESCE(inv.totalavailable, 0) + COALESCE(inv.onorder, 0) AS "Available Quantity Including Items On Order",
-                            FLOOR(COALESCE(inv.totalavailable, 0) + COALESCE(inv.onorder, 0) / b.quantity) AS "Buildable Amount"
+                            COALESCE(inv.totalavailable, 0) + COALESCE(comp_master.onorder, 0) AS "Available Quantity Including Items On Order",
+                            FLOOR(COALESCE(inv.totalavailable, 0) + COALESCE(comp_master.onorder, 0) / b.quantity) AS "Buildable Amount"
                         """
             output_file_name_addition += " On-Order"
             add_to_output_file_name = True
             if desired_amount:
                 get_report += """
                                 ,
-                                ((COALESCE(inv.totalavailable, 0) + COALESCE(inv.onorder, 0)) - %s * b.quantity) AS "Available-Desired Quantity"
+                                ((COALESCE(inv.totalavailable, 0) + COALESCE(comp_master.onorder, 0)) - %s * b.quantity) AS "Available-Desired Quantity"
                             """
                 params.append(desired_amount)
                 output_file_name_addition += " Desired Amount"
@@ -120,15 +103,15 @@ def create_report(assembly_num, contract, output_directory, include_inspection=F
         elif include_inspection == True and include_on_order == True:
             get_report += """
                             ,
-                            COALESCE(inv.totalavailable, 0) + COALESCE(inv.onorder, 0) + COALESCE(inspection.totalavailable, 0) AS "Available Quantity Including Items On Order and Pending Inspection",
-                            FLOOR(COALESCE(inv.totalavailable, 0) + COALESCE(inv.onorder, 0) + COALESCE(inspection.totalavailable, 0) / b.quantity) AS "Buildable Amount"
+                            COALESCE(inv.totalavailable, 0) + COALESCE(comp_master.onorder, 0) + COALESCE(inspection.totalavailable, 0) AS "Available Quantity Including Items On Order and Pending Inspection",
+                            FLOOR(COALESCE(inv.totalavailable, 0) + COALESCE(comp_master.onorder, 0) + COALESCE(inspection.totalavailable, 0) / b.quantity) AS "Buildable Amount"
                         """
             output_file_name_addition += " Inspection and On-Order"
             add_to_output_file_name = True
             if desired_amount:
                 get_report += """
                                 ,
-                                ((COALESCE(inv.totalavailable, 0) + COALESCE(inv.onorder, 0) + COALESCE(inspection.totalavailable, 0)) - %s * b.quantity) AS "Available-Desired Quantity"
+                                ((COALESCE(inv.totalavailable, 0) + COALESCE(comp_master.onorder, 0) + COALESCE(inspection.totalavailable, 0)) - %s * b.quantity) AS "Available-Desired Quantity"
                             """
                 params.append(desired_amount)
                 output_file_name_addition += " Desired Amount"
@@ -200,7 +183,7 @@ def create_report(assembly_num, contract, output_directory, include_inspection=F
                         comp_master.manufacturer,
                         comp_master.category,
                         inv.totalavailable,
-                        inv.onorder,
+                        comp_master.onorder,
                         inspection.totalavailable
 
                     ORDER BY comp_master.waspnumber;

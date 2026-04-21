@@ -9,7 +9,6 @@ import os
 class BuildableAssemblyWaspReportGenerator:
     list_of_contracts = ['RGI35', 'QIN05', 'QIN11', 'General'] # list of contracts
     def __init__(self, root):
-        self.refresh_database(refresh_combobox=False)
         self.root = root
         self.root.minsize(800, 600)
         self.root.title("Buildable Assembly WASP Report Generator")
@@ -17,8 +16,9 @@ class BuildableAssemblyWaspReportGenerator:
         mainframe.grid(column=0, row=0, sticky=("N", "W", "E", "S"))
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
+        self.refresh_database(refresh_combobox=False)
 
-        # row 0
+        # row 0 - assembly selection combobox
         tk.Label(mainframe, text="Assembly:").grid(row=0, column=0, sticky="e")
         self.assembly_combobox = ttk.Combobox(mainframe, width=80, state="readonly")
         # populate the combobox with the list of assemblies and their descriptions
@@ -35,7 +35,7 @@ class BuildableAssemblyWaspReportGenerator:
             self.assembly_combobox.current(0)
         self.assembly_combobox.grid(row=0, column=1, columnspan=2)
 
-        #row 1
+        #row 1 - contract selection combobox
         tk.Label(mainframe, text="Contract/GO#:").grid(row=1, column=0, sticky="e")
         self.contract_combobox = ttk.Combobox(mainframe, width=80, state="readonly")
         # populate the combobox with the list of contracts
@@ -44,31 +44,31 @@ class BuildableAssemblyWaspReportGenerator:
             self.contract_combobox.current(0)
         self.contract_combobox.grid(row=1, column=1, columnspan=2)
 
-        #row 2
+        #row 2 - include inspection checkbox
         tk.Label(mainframe, text="Include Inspection QTY in Available QTY?:").grid(row=2, column=0, sticky="w")
         self.include_inspection = tk.BooleanVar() # stores the boolean value returned from the inspection checkbox
         self.include_inspection_check = ttk.Checkbutton(mainframe, text='Yes/No', variable=self.include_inspection, onvalue=True, offvalue=False)
         self.include_inspection_check.grid(row=2, column=1, sticky="w")
 
-        #row 3
+        #row 3 - include on-order checkbox
         tk.Label(mainframe, text="Include On-Order QTY in Available QTY?:").grid(row=3, column=0, sticky="e")
         self.include_on_order = tk.BooleanVar() # stores the boolean value returned from the on order checkbox
         self.include_on_order_check = ttk.Checkbutton(mainframe, text='Yes/No', variable=self.include_on_order, onvalue=True, offvalue=False)
         self.include_on_order_check.grid(row=3, column=1, sticky="w")
 
-        #row 4
+        #row 4 - desired amount of units entrybox
         tk.Label(mainframe, text="Desired Amount of Units:").grid(row=4, column=0, sticky="e")
         self.desired_amount = tk.IntVar() # stores the desired amount
         self.desired_amount_entry = ttk.Entry(mainframe, width=20, textvariable=self.desired_amount)
         self.desired_amount_entry.grid(row=4, column=1, sticky="w")
 
-        #row 5
+        #row 5 - include cost checkbox
         tk.Label(mainframe, text="Include Cost?:").grid(row=5, column=0, sticky="e")
         self.include_cost = tk.BooleanVar() # stores the boolean value for whether or not to include cost
         self.include_cost_check = ttk.Checkbutton(mainframe, text='Yes/No', variable=self.include_cost, onvalue=True, offvalue=False)
         self.include_cost_check.grid(row=5, column=1, sticky="w")
 
-        #row 6
+        #row 6 - output directory entry
         tk.Label(mainframe, text="Output Directory:").grid(row=6, column=0, sticky="e")
         self.output_folder = tk.StringVar() # stores the output folder directory
         self.output_folder_entry = ttk.Entry(mainframe, width=65, textvariable=self.output_folder)
@@ -76,11 +76,11 @@ class BuildableAssemblyWaspReportGenerator:
         self.browse_output_folder_button = ttk.Button(mainframe, text="Browse", command=self.browse_output_folder, width=10)
         self.browse_output_folder_button.grid(row=6, column=2, padx=2)
 
-        #row 7
+        #row 7 - refresh database button
         self.refresh_database_button = ttk.Button(mainframe, text="Refresh Database (connect to i2TechInventory WiFi before clicking)", command=lambda: self.refresh_database(refresh_combobox=True))
         self.refresh_database_button.grid(row=7, column=0, columnspan=3)
 
-        #row 8
+        #row 8 - generate report button
         self.generate_report_button = ttk.Button(mainframe, text="Generate Report", command=self.report_gen_wrapper)
         self.generate_report_button.grid(row=8, column=0, columnspan=3)
 
@@ -135,6 +135,7 @@ class BuildableAssemblyWaspReportGenerator:
                                         contract=self.contract_combobox.get(), 
                                         include_inspection=self.include_inspection.get(), 
                                         include_cost=self.include_cost.get(),
+                                        include_on_order=self.include_on_order.get(),
                                         output_directory=output_dir)
             else:
                 report_gen.create_report(assembly_num=waspnumber, 
@@ -142,6 +143,7 @@ class BuildableAssemblyWaspReportGenerator:
                                         include_inspection=self.include_inspection.get(), 
                                         include_cost=self.include_cost.get(), 
                                         desired_amount=self.desired_amount.get(),
+                                        include_on_order=self.include_on_order.get(),
                                         output_directory=output_dir)
             messagebox.showinfo(title='Generate Report', message=f"Generated report successfully at {output_dir}!")
         except Exception as e:
