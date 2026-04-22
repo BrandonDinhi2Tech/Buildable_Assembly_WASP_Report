@@ -56,41 +56,47 @@ class BuildableAssemblyWaspReportGenerator:
         self.include_on_order_check = ttk.Checkbutton(mainframe, text='Yes/No', variable=self.include_on_order, onvalue=True, offvalue=False)
         self.include_on_order_check.grid(row=3, column=1, sticky="w")
 
-        #row 4 - desired amount of units entrybox
-        tk.Label(mainframe, text="Desired Amount of Units:").grid(row=4, column=0, sticky="e")
-        self.desired_amount = tk.IntVar() # stores the desired amount
-        self.desired_amount_entry = ttk.Entry(mainframe, width=20, textvariable=self.desired_amount)
-        self.desired_amount_entry.grid(row=4, column=1, sticky="w")
+        #row 4 - include kitted checkbox
+        tk.Label(mainframe, text="Include Kitted QTY in Available QTY?:").grid(row=4, column=0, sticky="e")
+        self.include_kitted=tk.BooleanVar() # stores the boolean value returned from the kitted checkbox
+        self.include_kitted_check = ttk.Checkbutton(mainframe, text='Yes/No', variable=self.include_kitted, onvalue=True, offvalue=False)
+        self.include_kitted_check.grid(row=4, column=1, sticky="w")
 
-        #row 5 - include cost checkbox
-        tk.Label(mainframe, text="Include Cost?:").grid(row=5, column=0, sticky="e")
+        #row 5 - desired amount of units entrybox
+        tk.Label(mainframe, text="Desired Amount of Units:").grid(row=5, column=0, sticky="e")
+        self.desired_amount_entry = ttk.Entry(mainframe, width=20)
+        self.desired_amount_entry.grid(row=5, column=1, sticky="w")
+
+        #row 6 - include cost checkbox
+        tk.Label(mainframe, text="Include Cost?:").grid(row=6, column=0, sticky="e")
         self.include_cost = tk.BooleanVar() # stores the boolean value for whether or not to include cost
         self.include_cost_check = ttk.Checkbutton(mainframe, text='Yes/No', variable=self.include_cost, onvalue=True, offvalue=False)
-        self.include_cost_check.grid(row=5, column=1, sticky="w")
+        self.include_cost_check.grid(row=6, column=1, sticky="w")
 
-        #row 6 - output directory entry
-        tk.Label(mainframe, text="Output Directory:").grid(row=6, column=0, sticky="e")
+        #row 7 - output directory entry
+        tk.Label(mainframe, text="Output Directory:").grid(row=7, column=0, sticky="e")
         self.output_folder = tk.StringVar() # stores the output folder directory
         self.output_folder_entry = ttk.Entry(mainframe, width=65, textvariable=self.output_folder)
-        self.output_folder_entry.grid(row=6, column=1, sticky="w")
+        self.output_folder_entry.grid(row=7, column=1, sticky="w")
         self.browse_output_folder_button = ttk.Button(mainframe, text="Browse", command=self.browse_output_folder, width=10)
-        self.browse_output_folder_button.grid(row=6, column=2, padx=2)
+        self.browse_output_folder_button.grid(row=7, column=2, padx=2)
 
-        #row 7 - refresh database button
+        #row 8 - refresh database button
         self.refresh_database_button = ttk.Button(mainframe, text="Refresh Database (connect to i2TechInventory WiFi before clicking)", command=lambda: self.refresh_database(refresh_combobox=True))
-        self.refresh_database_button.grid(row=7, column=0, columnspan=3)
+        self.refresh_database_button.grid(row=8, column=0, columnspan=3)
 
-        #row 8 - generate report button
+        #row 9 - generate report button
         self.generate_report_button = ttk.Button(mainframe, text="Generate Report", command=self.report_gen_wrapper)
-        self.generate_report_button.grid(row=8, column=0, columnspan=3)
+        self.generate_report_button.grid(row=9, column=0, columnspan=3)
 
 
-
+    # brings up folder selection dialog
     def browse_output_folder(self):
         folder_selected = filedialog.askdirectory()
         if folder_selected:
             self.output_folder.set(folder_selected)
 
+    # refreshes database and optionally the assembly combobox as well
     def refresh_database(self, refresh_combobox):
         try:
             location.update_location_table()
@@ -129,23 +135,32 @@ class BuildableAssemblyWaspReportGenerator:
         if not output_dir:
             output_dir = os.getcwd()
 
+        # make sure desired_amount is cast to int
+        desired_amount = self.desired_amount_entry.get().strip()
+        if desired_amount == "":
+            desired_amount = None
+        else:
+            desired_amount = int(desired_amount)
+
         try:
-            if self.desired_amount == 0:
+            if desired_amount is None:
                 report_gen.create_report(assembly_num=waspnumber, 
                                         contract=self.contract_combobox.get(), 
                                         include_inspection=self.include_inspection.get(), 
                                         include_cost=self.include_cost.get(),
                                         include_on_order=self.include_on_order.get(),
+                                        include_kitted=self.include_kitted.get(),
                                         output_directory=output_dir)
             else:
                 report_gen.create_report(assembly_num=waspnumber, 
                                         contract=self.contract_combobox.get(), 
                                         include_inspection=self.include_inspection.get(), 
                                         include_cost=self.include_cost.get(), 
-                                        desired_amount=self.desired_amount.get(),
+                                        desired_amount=desired_amount,
                                         include_on_order=self.include_on_order.get(),
+                                        include_kitted=self.include_kitted.get(),
                                         output_directory=output_dir)
-            messagebox.showinfo(title='Generate Report', message=f"Generated report successfully at {output_dir}!")
+            messagebox.showinfo(title='Generate Report', message=f"Generated report successfully at {output_dir}")
         except Exception as e:
             messagebox.showerror('Failed to generate report', str(e))
         
