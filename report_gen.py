@@ -6,6 +6,7 @@ from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
 import os
 
+# builds the query that generates the report
 def build_report_query(
     assembly_id,
     contract,
@@ -13,9 +14,38 @@ def build_report_query(
     include_inspection=False,
     include_on_order=False,
     include_kitted=False,
-    desired_amount=None
+    desired_amount=None,
+    include_assembled=False
 ):
     params = []
+
+    # getting the total amount of each inventory item in each top level BOM
+    # this accounts for multi-level BOMs
+    cte = ""
+    if include_assembled:
+        cte = """
+                WITH RECURSIVE flattened_bom AS (
+                    SELECT 
+                        b.parent_item_id AS root_item_id,
+                        b.component_item_id,
+                        b.quantity::numeric AS total_quantity
+                    FROM bom b
+
+                    JOIN items root_item
+                    ON root_item.id = b.parent_item_id
+                    WHERE root_item.category = ANY(%s)
+
+                    UNION ALL
+
+                    SELECT
+                        fb.root_item_id,
+                        b.component_item_id,
+                        fb.total_quantity * b.quantity
+                    FROM flattened_bom fb
+                    JOIN bom b
+                        ON fb.component_item_id = b.parent_item_id
+                ) 
+        """
 
     # ----------------------------
     # 1. SELECT base columns
@@ -31,6 +61,7 @@ def build_report_query(
         'COALESCE(inspection.totalavailable, 0) AS "Quantity Pending Inspection"',
         'COALESCE(comp_master.onorder, 0) AS "Quantity on Order"',
         'COALESCE(kit.totalavailable, 0) AS "Quantity Kitted for Contract"',
+        'COALESCE(assembled.totalavailable, 0) AS "Quantity in Assembled Assemblies"'
     ]
 
     if include_cost:
@@ -50,6 +81,9 @@ def build_report_query(
     if include_kitted:
         available_terms.append('COALESCE(kit.totalavailable, 0)')
 
+    if include_assembled:
+        available_terms.append('COALESCE(assembled.totalavailable, 0)')
+
     available_expr = " + ".join(available_terms)
 
     # Add computed columns
@@ -58,7 +92,7 @@ def build_report_query(
 
     if desired_amount:
         select_parts.append(f'({available_expr} - %s * b.quantity) AS "Available-Desired Quantity"')
-        params.append(desired_amount)
+        
 
     # ----------------------------
     # 3. Contract -> parameters
@@ -66,19 +100,23 @@ def build_report_query(
     contract_map = {
         'RGI35': {
             'stock': 'RGI35 i2Tech Stock',
-            'kit_patterns': ['%RGI35%', '%LV-L01%']
+            'kit_patterns': ['%RGI35%', '%LV-L01%'],
+            'assy_category': ['616-12 RGI35 i2AX(BLK2)']
         },
         'QIN05': {
             'stock': 'QIN05-STK',
-            'kit_patterns': ['%QIN05%']
+            'kit_patterns': ['%QIN05%'],
+            'assy_category': ['910-01 i2DAS (QIN05, QIN11)']
         },
         'QIN11': {
             'stock': 'QIN11-STK',
-            'kit_patterns': ['%QIN11%']
+            'kit_patterns': ['%QIN11%'],
+            'assy_category': ['910-01 i2DAS (QIN05, QIN11)']
         },
         'General': {
             'stock': 'SiteA',
-            'kit_patterns': ['%SiteA%']
+            'kit_patterns': ['%SiteA%'],
+            'assy_category': ['910-01 i2DAS (QIN05, QIN11)', '616-12 RGI35 i2AX(BLK2)', '610-10 xxx i2ULS(BLK3)']
         }
     }
 
@@ -87,15 +125,70 @@ def build_report_query(
 
     stock_site = contract_map[contract]['stock']
     kit_patterns = contract_map[contract]['kit_patterns']
+    assy_category = contract_map[contract]['assy_category']
 
+    if include_assembled:
+        params.append(assy_category)
+    if desired_amount:
+        params.append(desired_amount)
     params.append(stock_site)
     params.append(kit_patterns)
     params.append(assembly_id)
 
     # ----------------------------
-    # 4. Final query
+    # 4. Additions to Query to Allow for Including Assembled QTY
+    # ----------------------------
+
+
+    # this multiplies the amount of each assembly already assembled by the amount of the item in its BOM
+    # in order to get the amount of each item that has already been put into a built assembly
+    assembled_join = ""
+    if include_assembled:
+        assembled_join = """
+            LEFT JOIN (
+                SELECT
+                    fb.component_item_id,
+                    SUM(parent_inv.totalavailable * fb.total_quantity) AS totalavailable
+                FROM flattened_bom fb
+
+                JOIN items root_item
+                ON root_item.id = fb.root_item_id
+
+                JOIN (
+                    SELECT waspnumber, SUM(totalavailable) AS totalavailable
+                    FROM items
+                    GROUP BY waspnumber
+                ) parent_inv
+                    ON parent_inv.waspnumber = root_item.waspnumber
+
+                GROUP BY fb.component_item_id
+            ) assembled
+                ON assembled.component_item_id = comp_master.id
+        """
+
+    group_by_parts = [
+        'parent.waspnumber',
+        'comp_master.waspnumber',
+        'comp_master.description',
+        'b.quantity',
+        'comp_master.cost',
+        'comp_master.manufacturer',
+        'comp_master.category',
+        'inv.totalavailable',
+        'comp_master.onorder',
+        'inspection.totalavailable',
+        'kit.totalavailable'
+    ]
+
+    if include_assembled:
+        group_by_parts.append('assembled.totalavailable')
+
+    # ----------------------------
+    # 5. Final query
     # ----------------------------
     query = f"""
+        {cte}
+
         SELECT
             {",\n            ".join(select_parts)}
 
@@ -132,26 +225,18 @@ def build_report_query(
         ) kit
             ON kit.waspnumber = comp_master.waspnumber
 
+        {assembled_join}
+
         WHERE parent.id = %s
 
-        GROUP BY
-            parent.waspnumber,
-            comp_master.waspnumber,
-            comp_master.description,
-            b.quantity,
-            comp_master.cost,
-            comp_master.manufacturer,
-            comp_master.category,
-            inv.totalavailable,
-            comp_master.onorder,
-            inspection.totalavailable,
-            kit.totalavailable
+        GROUP BY {", ".join(group_by_parts)}
 
         ORDER BY comp_master.waspnumber;
     """
 
     return query, params
 
+# builds the output file name
 def build_output_filename(
     assembly_num,
     contract,
@@ -159,7 +244,8 @@ def build_output_filename(
     include_inspection=False,
     include_on_order=False,
     include_kitted=False,
-    desired_amount=None
+    desired_amount=None,
+    include_assembled=False
 ):
     parts = [f"{assembly_num} Report for {contract}", "Including"]
 
@@ -177,20 +263,21 @@ def build_output_filename(
 
     if desired_amount:
         parts.append("Desired Amount")
+    
+    if include_assembled:
+        parts.append("Assembled")
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
 
     flags = " ".join(parts)
-    filename = flags + f" {timestamp}.xlsx"
+    filename = f" {timestamp} " + flags + ".xlsx"
 
     return flags, filename
 
 
 # this function is to generate the report in a spreadsheet for the user to review
-# takes into account the assembly's WASP number and the contract that the program should calculate inventory from
-# also takes into account whether or not inspection and/or on-order quantities should be in the buildable amount calculation
-# also has option for sanitizing item costs from the report
-# also has an option for inputting a desired amount of units to see how available inventory compares to the desired amount
+# uses the helper functions in order to generate the query and filename
+# this function handles the actual output to a spreadsheet 
 def create_report(
     assembly_num, 
     contract, 
@@ -199,7 +286,9 @@ def create_report(
     include_on_order=False, 
     include_kitted=False, 
     include_cost=False, 
-    desired_amount=None
+    desired_amount=None,
+    list_of_contracts=None,
+    include_assembled=False
 ):
 
     # depending on the contract, the site that you can pull parts from changes
@@ -216,177 +305,6 @@ def create_report(
                         LIMIT 1
                         """, (assembly_num,))
         assembly_id = cursor.fetchone()[0] 
-        # #print("assembly_id:", assembly_id)
-        # # cursor.execute(
-        # #     "SELECT * FROM bom WHERE parent_item_id = %s",
-        # #     (assembly_id,)
-        # # )
-        # #print("bom rows:", cursor.fetchall())
-        # get_report = """
-        #                     SELECT
-        #                         parent.waspnumber AS "Assembly",
-        #                         comp_master.waspnumber AS "Component",
-        #                         comp_master.category AS "Component Category",
-        #                         comp_master.description AS "Component Description",
-        #                         comp_master.manufacturer AS "Component Manufacturer",
-        #                         b.quantity AS "Quantity in BOM",
-        #                         COALESCE(inv.totalavailable, 0) AS "Available Quantity In Contract's Stock",
-        #                         COALESCE(inspection.totalavailable, 0) AS "Quantity Pending Inspection",
-        #                         COALESCE(comp_master.onorder, 0) AS "Quantity on Order",
-        #                         COALESCE(kit.totalavailable, 0) AS "Quantity Kitted for Contract"
-        #                     """
-        # params = [] # this will hold all of the %s params for the sql execution later
-        # output_file_name = f"{assembly_num} Report for {contract}" # this will be the output file name which changes based on the parameters of the report
-        # output_file_name_addition = " Including" # this will be concatenated to output_file_name if needed
-        # add_to_output_file_name = False # indicates whether output_file_name needs something added to it
-
-        # #if we want to include item costs in the report
-        # if include_cost == True:
-        #     get_report += """
-        #                     ,
-        #                     comp_master.cost AS "Component Cost"
-        #                 """
-        #     output_file_name_addition += " Cost"
-        #     add_to_output_file_name = True
-        # else:
-        #     output_file_name_addition += " No Cost"
-        #     add_to_output_file_name = True
-        
-        # # if we want to include pending inspection quantities in the buildable amount calculation
-        # if include_inspection == True and include_on_order == False:
-        #     get_report += """
-        #                     ,
-        #                     COALESCE(inv.totalavailable, 0) + COALESCE(inspection.totalavailable, 0) AS "Available Quantity Including Items Pending Inspection",
-        #                     FLOOR((COALESCE(inv.totalavailable, 0) + COALESCE(inspection.totalavailable, 0)) / b.quantity) AS "Buildable Amount"
-        #                 """
-        #     output_file_name_addition += " Inspection"
-        #     add_to_output_file_name = True
-        #     if desired_amount:
-        #         get_report += """
-        #                         ,
-        #                         ((COALESCE(inv.totalavailable, 0) + COALESCE(inspection.totalavailable, 0)) - %s * b.quantity) AS "Available-Desired Quantity"
-        #                     """
-        #         params.append(desired_amount)
-        #         output_file_name_addition += " Desired Amount"
-        #         add_to_output_file_name = True
-
-        # # if we want to include on order quantities in the buildable amount calculation
-        # elif include_inspection == False and include_on_order == True:
-        #     get_report += """
-        #                     ,
-        #                     COALESCE(inv.totalavailable, 0) + COALESCE(comp_master.onorder, 0) AS "Available Quantity Including Items On Order",
-        #                     FLOOR((COALESCE(inv.totalavailable, 0) + COALESCE(comp_master.onorder, 0)) / b.quantity) AS "Buildable Amount"
-        #                 """
-        #     output_file_name_addition += " On-Order"
-        #     add_to_output_file_name = True
-        #     if desired_amount:
-        #         get_report += """
-        #                         ,
-        #                         ((COALESCE(inv.totalavailable, 0) + COALESCE(comp_master.onorder, 0)) - %s * b.quantity) AS "Available-Desired Quantity"
-        #                     """
-        #         params.append(desired_amount)
-        #         output_file_name_addition += " Desired Amount"
-        #         add_to_output_file_name = True
-
-        # # if we want to include both on order quantities and pending inspection quantities in the buildable amount calculation
-        # elif include_inspection == True and include_on_order == True:
-        #     get_report += """
-        #                     ,
-        #                     COALESCE(inv.totalavailable, 0) + COALESCE(comp_master.onorder, 0) + COALESCE(inspection.totalavailable, 0) AS "Available Quantity Including Items On Order and Pending Inspection",
-        #                     FLOOR((COALESCE(inv.totalavailable, 0) + COALESCE(comp_master.onorder, 0) + COALESCE(inspection.totalavailable, 0)) / b.quantity) AS "Buildable Amount"
-        #                 """
-        #     output_file_name_addition += " Inspection and On-Order"
-        #     add_to_output_file_name = True
-        #     if desired_amount:
-        #         get_report += """
-        #                         ,
-        #                         ((COALESCE(inv.totalavailable, 0) + COALESCE(comp_master.onorder, 0) + COALESCE(inspection.totalavailable, 0)) - %s * b.quantity) AS "Available-Desired Quantity"
-        #                     """
-        #         params.append(desired_amount)
-        #         output_file_name_addition += " Desired Amount"
-        #         add_to_output_file_name = True
-
-        # # if we just want the stock count included in the buildable amount calculation
-        # else:
-        #     get_report += """
-        #                     ,
-        #                     FLOOR(COALESCE(inv.totalavailable, 0) / b.quantity) AS "Buildable Amount"
-        #                 """
-        #     output_file_name_addition += " Stock Only"
-        #     add_to_output_file_name = True
-        #     if desired_amount:
-        #         get_report += """
-        #                         ,
-        #                         (COALESCE(inv.totalavailable, 0) - %s * b.quantity) AS "Available-Desired Quantity"
-        #                     """
-        #         params.append(desired_amount)
-        #         output_file_name_addition += " Desired Amount"
-        #         add_to_output_file_name = True
-
-        # # adding all additional parameters to output file name as well as the file extension and the datetime of creation
-        # if add_to_output_file_name == True:
-        #     output_file_name += output_file_name_addition
-        #     output_file_name += f" {datetime.now().strftime("%Y-%m-%d_%H%M%S")}.xlsx"
-        
-        # if output_directory:
-        #     full_path = os.path.join(output_directory, output_file_name)
-
-        # get_report += """
-        #             FROM bom b
-
-        #             -- parent assembly
-        #             JOIN items parent
-        #                 ON parent.id = b.parent_item_id
-
-        #             -- component "master" row
-        #             JOIN items comp_master
-        #                 ON comp_master.id = b.component_item_id
-
-        #             -- aggregate inventory FIRST
-        #             LEFT JOIN (
-        #                 SELECT waspnumber, SUM(totalavailable) AS totalavailable, MAX(onorder) as onorder
-        #                 FROM items
-        #                 WHERE sitename = %s
-        #                 GROUP BY waspnumber
-        #             ) inv
-        #                 ON inv.waspnumber = comp_master.waspnumber
-
-        #             -- aggregate inspection FIRST
-        #             LEFT JOIN (
-        #                 SELECT waspnumber, SUM(totalavailable) AS totalavailable
-        #                 FROM items
-        #                 WHERE sitename = 'Lab'
-        #                 AND locationcode = 'Inspection'
-        #                 GROUP BY waspnumber
-        #             ) inspection
-        #                 ON inspection.waspnumber = comp_master.waspnumber
-
-        #             -- aggregate kitted first
-        #             LEFT JOIN (
-        #                 SELECT waspnumber, SUM(totalavailable) AS totalavailable
-        #                 FROM items
-        #                 WHERE sitename LIKE ANY(%s)
-        #                 GROUP BY waspnumber
-        #             ) kit
-        #                 ON kit.waspnumber = comp_master.waspnumber
-
-        #             WHERE parent.id = %s
-
-        #             GROUP BY
-        #                 parent.waspnumber,
-        #                 comp_master.waspnumber,
-        #                 comp_master.description,
-        #                 b.quantity,
-        #                 comp_master.cost,
-        #                 comp_master.manufacturer,
-        #                 comp_master.category,
-        #                 inv.totalavailable,
-        #                 comp_master.onorder,
-        #                 inspection.totalavailable,
-        #                 kit.totalavailable
-
-        #             ORDER BY comp_master.waspnumber;
-        #             """
 
         # building the report query and the params for the query execution
         get_report, params = build_report_query(assembly_id=assembly_id,
@@ -395,7 +313,8 @@ def create_report(
                                                 include_inspection=include_inspection,
                                                 include_on_order=include_on_order,
                                                 include_kitted=include_kitted,
-                                                desired_amount=desired_amount)
+                                                desired_amount=desired_amount,
+                                                include_assembled=include_assembled)
         
         # building the output filename and the flags for the in-report title
         report_title_flags, file_name=build_output_filename(assembly_num=assembly_num,
@@ -404,33 +323,20 @@ def create_report(
                                         include_inspection=include_inspection,
                                         include_on_order=include_on_order,
                                         include_kitted=include_kitted,
-                                        desired_amount=desired_amount)
+                                        desired_amount=desired_amount,
+                                        include_assembled=include_assembled)
         
         # accounting for the user's chosen output directory
         if output_directory:
             full_path = os.path.join(output_directory, file_name)
         
-        #pick a site to draw parts from, execute the query, and put into dataframe
+        #execute the query if the contract is in the list of contracts
         df = None
-        match contract:
-            case 'RGI35':
-                print(get_report)
-                print(len(params), params)
-                df = pd.read_sql_query(get_report, conn, params=params)
-            case 'QIN05':
-                print(get_report)
-                print(len(params), params)
-                df = pd.read_sql_query(get_report, conn, params=params)
-            case 'QIN11':
-                print(get_report)
-                print(len(params), params)
-                df = pd.read_sql_query(get_report, conn, params=params)
-            case 'General':
-                print(get_report)
-                print(len(params), params)
-                df = pd.read_sql_query(get_report, conn, params=params)
-            case _:
-                print("Pick a valid contract.")
+        if contract in list_of_contracts:
+            print(get_report)
+            df = pd.read_sql_query(get_report, conn, params=params)
+        else:
+            raise ValueError("Pick a valid contract.")
 
         assembly_buildable = df["Buildable Amount"].min() #amount of the assembly that can be built
 
@@ -462,7 +368,7 @@ def create_report(
                     break
 
             # highlighting all items that are short of meeting the desired amount
-            # these items will show up as negative
+            # these quantities will show up as negative
             if col_idx:
                 col_letter = get_column_letter(col_idx)
                 max_row = len(df) + 1
