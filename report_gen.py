@@ -87,7 +87,7 @@ def build_report_query(
     available_expr = " + ".join(available_terms)
 
     # Add computed columns
-    select_parts.append(f'{available_expr} AS "Available Quantity Used For Build"')
+    select_parts.append(f'{available_expr} AS "Total Available Quantity"')
     select_parts.append(f'FLOOR(({available_expr}) / b.quantity) AS "Buildable Amount"')
 
     if desired_amount:
