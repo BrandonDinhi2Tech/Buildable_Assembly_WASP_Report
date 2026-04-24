@@ -5,95 +5,131 @@ import report_gen
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import os
+import ttkbootstrap
 
 class BuildableAssemblyWaspReportGenerator:
-    list_of_contracts = ['RGI35', 'QIN05', 'QIN11', 'General'] # list of contracts
+    list_of_contracts = ['RGI35', 'QIN05', 'QIN11', 'General']
+
     def __init__(self, root):
         self.root = root
-        self.root.minsize(800, 600)
         self.root.title("Buildable Assembly WASP Report Generator")
-        mainframe = ttk.Frame(root, padding="3 3 12 12")
-        mainframe.grid(column=0, row=0, sticky=("N", "W", "E", "S"))
-        self.root.columnconfigure(0, weight=1)
-        self.root.rowconfigure(0, weight=1)
+        self.root.minsize(800, 600)
+
+        mainframe = ttk.Frame(root, padding=15)
+        mainframe.grid(row=0, column=0, sticky="nsew")
+        root.columnconfigure(0, weight=1)
+        root.rowconfigure(0, weight=1)
+        mainframe.columnconfigure(1, weight=1)
+
+        # Title
+        title = ttk.Label(
+            mainframe,
+            text="Buildable Assembly WASP Report Generator",
+            font=("Segoe UI", 16, "bold")
+        )
+        title.grid(row=0, column=0, columnspan=3, pady=(0, 15))
+
+        # Refresh DB initially
         self.refresh_database(refresh_combobox=False)
 
-        # row 0 - assembly selection combobox
-        tk.Label(mainframe, text="Assembly:").grid(row=0, column=0, sticky="e")
-        self.assembly_combobox = ttk.Combobox(mainframe, width=80, state="readonly")
-        # populate the combobox with the list of assemblies and their descriptions
+        # ------------------ Selection Frame ------------------
+        selection_frame = ttk.LabelFrame(mainframe, text="Selection", padding=10)
+        selection_frame.grid(row=1, column=0, columnspan=3, sticky="ew", pady=5)
+        selection_frame.columnconfigure(1, weight=1)
+
+        ttk.Label(selection_frame, text="Assembly:").grid(row=0, column=0, sticky="e")
+        self.assembly_combobox = ttk.Combobox(selection_frame, width=50, state="readonly")
+
         try:
             self.assembly_list = assembly.get_assy_wasp_and_desc()
             display_values = [
                 f"{a['waspnumber']} - {a['description']}"
-            for a in self.assembly_list
+                for a in self.assembly_list
             ]
         except Exception as e:
             messagebox.showerror("Failed getting assembly list", str(e))
+            display_values = []
+            self.assembly_list = []
+
         self.assembly_combobox['values'] = display_values
         if self.assembly_list:
             self.assembly_combobox.current(0)
-        self.assembly_combobox.grid(row=0, column=1, columnspan=2)
+        self.assembly_combobox.grid(row=0, column=1, sticky="ew")
 
-        #row 1 - contract selection combobox
-        tk.Label(mainframe, text="Contract/GO#:").grid(row=1, column=0, sticky="e")
-        self.contract_combobox = ttk.Combobox(mainframe, width=80, state="readonly")
-        # populate the combobox with the list of contracts
+        ttk.Label(selection_frame, text="Contract/GO#:").grid(row=1, column=0, sticky="e")
+        self.contract_combobox = ttk.Combobox(selection_frame, width=50, state="readonly")
         self.contract_combobox['values'] = self.list_of_contracts
         if self.list_of_contracts:
             self.contract_combobox.current(0)
-        self.contract_combobox.grid(row=1, column=1, columnspan=2)
+        self.contract_combobox.grid(row=1, column=1, sticky="ew")
 
-        #row 2 - include inspection checkbox
-        tk.Label(mainframe, text="Include Inspection QTY in Available QTY?:").grid(row=2, column=0, sticky="w")
-        self.include_inspection = tk.BooleanVar() # stores the boolean value returned from the inspection checkbox
-        self.include_inspection_check = ttk.Checkbutton(mainframe, text='Yes/No', variable=self.include_inspection, onvalue=True, offvalue=False)
-        self.include_inspection_check.grid(row=2, column=1, sticky="w")
+        # ------------------ Options Frame ------------------
+        options_frame = ttk.LabelFrame(mainframe, text="Availability Options", padding=10)
+        options_frame.grid(row=2, column=0, columnspan=3, sticky="ew", pady=5)
 
-        #row 3 - include on-order checkbox
-        tk.Label(mainframe, text="Include On-Order QTY in Available QTY?:").grid(row=3, column=0, sticky="e")
-        self.include_on_order = tk.BooleanVar() # stores the boolean value returned from the on order checkbox
-        self.include_on_order_check = ttk.Checkbutton(mainframe, text='Yes/No', variable=self.include_on_order, onvalue=True, offvalue=False)
-        self.include_on_order_check.grid(row=3, column=1, sticky="w")
+        self.include_inspection = tk.BooleanVar()
+        ttk.Checkbutton(options_frame, text="Include Inspection Quantity", variable=self.include_inspection).grid(row=0, column=0, sticky="w")
 
-        #row 4 - include kitted checkbox
-        tk.Label(mainframe, text="Include Kitted QTY in Available QTY?:").grid(row=4, column=0, sticky="e")
-        self.include_kitted=tk.BooleanVar() # stores the boolean value returned from the kitted checkbox
-        self.include_kitted_check = ttk.Checkbutton(mainframe, text='Yes/No', variable=self.include_kitted, onvalue=True, offvalue=False)
-        self.include_kitted_check.grid(row=4, column=1, sticky="w")
+        self.include_on_order = tk.BooleanVar()
+        ttk.Checkbutton(options_frame, text="Include On-Order Quantity", variable=self.include_on_order).grid(row=1, column=0, sticky="w")
 
-        #row 5 - include assembled checkbox
-        tk.Label(mainframe, text="Include Assembled QTY in Available QTY?:").grid(row=5, column=0, sticky="e")
-        self.include_assembled=tk.BooleanVar() # stores the boolean value returned from the assembled checkbox
-        self.include_assembled_check = ttk.Checkbutton(mainframe, text='Yes/No', variable=self.include_assembled, onvalue=True, offvalue=False)
-        self.include_assembled_check.grid(row=5, column=1, sticky="w")
+        self.include_kitted = tk.BooleanVar()
+        ttk.Checkbutton(options_frame, text="Include Kitted Quantity", variable=self.include_kitted).grid(row=2, column=0, sticky="w")
 
-        #row 6 - desired amount of units entrybox
-        tk.Label(mainframe, text="Desired Amount of Units:").grid(row=6, column=0, sticky="e")
-        self.desired_amount_entry = ttk.Entry(mainframe, width=20)
-        self.desired_amount_entry.grid(row=6, column=1, sticky="w")
+        self.include_assembled = tk.BooleanVar()
+        ttk.Checkbutton(options_frame, text="Include Assembled Quantity", variable=self.include_assembled).grid(row=3, column=0, sticky="w")
 
-        #row 7 - include cost checkbox
-        tk.Label(mainframe, text="Include Cost?:").grid(row=7, column=0, sticky="e")
-        self.include_cost = tk.BooleanVar() # stores the boolean value for whether or not to include cost
-        self.include_cost_check = ttk.Checkbutton(mainframe, text='Yes/No', variable=self.include_cost, onvalue=True, offvalue=False)
-        self.include_cost_check.grid(row=7, column=1, sticky="w")
+        # ------------------ Settings Frame ------------------
+        settings_frame = ttk.LabelFrame(mainframe, text="Settings", padding=10)
+        settings_frame.grid(row=3, column=0, columnspan=3, sticky="ew", pady=5)
+        settings_frame.columnconfigure(1, weight=1)
 
-        #row 8 - output directory entry
-        tk.Label(mainframe, text="Output Directory:").grid(row=8, column=0, sticky="e")
-        self.output_folder = tk.StringVar() # stores the output folder directory
-        self.output_folder_entry = ttk.Entry(mainframe, width=65, textvariable=self.output_folder)
-        self.output_folder_entry.grid(row=8, column=1, sticky="w")
-        self.browse_output_folder_button = ttk.Button(mainframe, text="Browse", command=self.browse_output_folder, width=10)
-        self.browse_output_folder_button.grid(row=8, column=2, padx=2)
+        ttk.Label(settings_frame, text="Desired Units:").grid(row=0, column=0, sticky="e")
+        self.desired_amount_entry = ttk.Entry(settings_frame, width=15, justify="right")
+        self.desired_amount_entry.grid(row=0, column=1, sticky="w")
 
-        #row 9 - refresh database button
-        self.refresh_database_button = ttk.Button(mainframe, text="Refresh Database (connect to i2TechInventory WiFi before clicking)", command=lambda: self.refresh_database(refresh_combobox=True))
-        self.refresh_database_button.grid(row=9, column=0, columnspan=3)
+        self.include_cost = tk.BooleanVar()
+        ttk.Checkbutton(settings_frame, text="Include Cost", variable=self.include_cost).grid(row=1, column=1, sticky="w")
 
-        #row 10 - generate report button
-        self.generate_report_button = ttk.Button(mainframe, text="Generate Report", command=self.report_gen_wrapper)
-        self.generate_report_button.grid(row=10, column=0, columnspan=3)
+        # ------------------ Output Frame ------------------
+        output_frame = ttk.LabelFrame(mainframe, text="Output", padding=10)
+        output_frame.grid(row=4, column=0, columnspan=3, sticky="ew", pady=5)
+        output_frame.columnconfigure(1, weight=1)
+
+        ttk.Label(output_frame, text="Output Directory:").grid(row=0, column=0, sticky="e")
+        self.output_folder = tk.StringVar()
+        self.output_folder_entry = ttk.Entry(output_frame, textvariable=self.output_folder)
+        self.output_folder_entry.grid(row=0, column=1, sticky="ew")
+
+        self.browse_output_folder_button = ttk.Button(
+            output_frame,
+            text="Browse",
+            command=self.browse_output_folder
+        )
+        self.browse_output_folder_button.grid(row=0, column=2, padx=5)
+
+        # ------------------ Actions ------------------
+        action_frame = ttk.Frame(mainframe)
+        action_frame.grid(row=5, column=0, columnspan=3, pady=15)
+
+        self.refresh_database_button = ttk.Button(
+            action_frame,
+            text="Refresh Database",
+            command=lambda: self.refresh_database(refresh_combobox=True)
+        )
+        self.refresh_database_button.grid(row=0, column=0, padx=5)
+
+        self.generate_report_button = ttk.Button(
+            action_frame,
+            text="Generate Report",
+            command=self.report_gen_wrapper
+        )
+        self.generate_report_button.grid(row=0, column=1, padx=5)
+
+        # Apply consistent padding
+        for child in mainframe.winfo_children():
+            child.grid_configure(padx=5, pady=5)
+
 
 
     # brings up folder selection dialog
@@ -177,7 +213,7 @@ class BuildableAssemblyWaspReportGenerator:
             messagebox.showerror('Failed to generate report', str(e))
 
 if __name__ == "__main__":
-    root = tk.Tk()
+    root=ttkbootstrap.Window(themename="flatly")
     app = BuildableAssemblyWaspReportGenerator(root)
     root.mainloop()
 
