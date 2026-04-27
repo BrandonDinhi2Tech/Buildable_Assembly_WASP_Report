@@ -142,8 +142,7 @@ class BuildableAssemblyWaspReportGenerator:
     def refresh_database(self, refresh_combobox):
         try:
             location.update_location_table()
-            item.entire_inventory_api_call('item_list.csv')
-            item.inventory_to_database('item_list.csv')
+            item.inventory_to_database(item.entire_inventory_api_call())
             assembly.update_bom_table()
             
             if refresh_combobox:

@@ -60,10 +60,12 @@ def build_report_query(
         'COALESCE(inv.totalavailable, 0) AS "Available Quantity In Contract\'s Stock"',
         'COALESCE(inspection.totalavailable, 0) AS "Quantity Pending Inspection"',
         'COALESCE(comp_master.onorder, 0) AS "Quantity on Order"',
-        'COALESCE(kit.totalavailable, 0) AS "Quantity Kitted for Contract"',
-        'COALESCE(assembled.totalavailable, 0) AS "Quantity in Assembled Assemblies"'
+        'COALESCE(kit.totalavailable, 0) AS "Quantity Kitted for Contract"'
     ]
 
+    if include_assembled:
+        select_parts.append('COALESCE(assembled.totalavailable, 0) AS "Quantity in Assembled Assemblies"')
+    
     if include_cost:
         select_parts.append('comp_master.cost AS "Component Cost"')
 
