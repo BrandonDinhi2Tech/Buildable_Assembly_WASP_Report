@@ -108,17 +108,17 @@ def build_report_query(
         'QIN05': {
             'stock': 'QIN05-STK',
             'kit_patterns': ['%QIN05%'],
-            'assy_category': ['910-01 i2DAS (QIN05, QIN11)']
+            'assy_category': ['910-02 i2DAS (QIN05, QIN11)']
         },
         'QIN11': {
             'stock': 'QIN11-STK',
             'kit_patterns': ['%QIN11%'],
-            'assy_category': ['910-01 i2DAS (QIN05, QIN11)']
+            'assy_category': ['910-02 i2DAS (QIN05, QIN11)']
         },
         'General': {
             'stock': 'SiteA',
             'kit_patterns': ['%SiteA%'],
-            'assy_category': ['910-01 i2DAS (QIN05, QIN11)', '616-12 RGI35 i2AX(BLK2)', '610-10 xxx i2ULS(BLK3)']
+            'assy_category': ['910-02 i2DAS (QIN05, QIN11)', '616-12 RGI35 i2AX(BLK2)', '610-10 xxx i2ULS(BLK3)']
         }
     }
 
