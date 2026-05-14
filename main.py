@@ -6,6 +6,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import os
 import ttkbootstrap
+import threading
+import time
 
 class BuildableAssemblyWaspReportGenerator:
     list_of_contracts = ['RGI35', 'QIN05', 'QIN11', 'General']
@@ -126,6 +128,9 @@ class BuildableAssemblyWaspReportGenerator:
         )
         self.generate_report_button.grid(row=0, column=1, padx=5)
 
+        self.last_refresh_label = ttk.Label(action_frame, text="Last refresh: Never")
+        self.last_refresh_label.grid(row=1, column=0, columnspan=2, pady=(10, 0))
+
         # Apply consistent padding
         for child in mainframe.winfo_children():
             child.grid_configure(padx=5, pady=5)
@@ -140,28 +145,54 @@ class BuildableAssemblyWaspReportGenerator:
 
     # refreshes database and optionally the assembly combobox as well
     def refresh_database(self, refresh_combobox):
-        try:
-            location.update_location_table()
-            item.inventory_to_database(item.entire_inventory_api_call())
-            assembly.update_bom_table()
-            
+        popup = tk.Toplevel(self.root)
+        popup.title("Database Refresh")
+        popup.geometry("300x150")
+        label = ttk.Label(popup, text="Refreshing database, please wait...")
+        label.pack(pady=10)
+        pb = ttk.Progressbar(popup, orient='horizontal', mode='indeterminate', length=280)
+        pb.pack(pady=10)
+        pb.start()
+
+        def do_work():
+            try:
+                location.update_location_table()
+                item.inventory_to_database(item.entire_inventory_api_call())
+                assembly.update_bom_table()
+
+                display_values = []
+                if refresh_combobox:
+                    try:
+                        self.assembly_list = assembly.get_assy_wasp_and_desc()
+                        display_values = [
+                            f"{a['waspnumber']} - {a['description']}"
+                            for a in self.assembly_list
+                        ]
+                    except Exception as e:
+                        self.root.after(0, lambda: messagebox.showerror("Failed getting assembly list", str(e)))
+
+                self.root.after(0, lambda: on_success(display_values))
+            except Exception as e:
+                self.root.after(0, lambda err=e: on_error(err))
+
+        def on_success(display_values):
+            pb.stop()
+            pb.destroy()
             if refresh_combobox:
-                # refresh the assembly combobox with the up to date values
-                try:
-                    self.assembly_list = assembly.get_assy_wasp_and_desc()
-                    display_values = [
-                        f"{a['waspnumber']} - {a['description']}"
-                    for a in self.assembly_list
-                    ]
-                except Exception as e:
-                    messagebox.showerror("Failed getting assembly list", str(e))
                 self.assembly_combobox['values'] = display_values
                 if self.assembly_list:
                     self.assembly_combobox.current(0)
+            label.config(text="Database refreshed successfully!")
+            ttk.Button(popup, text="OK", command=popup.destroy).pack(pady=5)
+            self.last_refresh_label.config(text=f"Last refresh: {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
-            messagebox.showinfo(title='Database Refresh', message='Refreshed database successfully!')
-        except Exception as e:
-            messagebox.showerror('Failed to refresh database', str(e))
+        def on_error(e):
+            pb.stop()
+            pb.destroy()
+            label.config(text=f"Failed to refresh database.")
+            ttk.Button(popup, text="OK", command=popup.destroy).pack(pady=5)
+
+        threading.Thread(target=do_work, daemon=True).start()
 
     def report_gen_wrapper(self):
         index = self.assembly_combobox.current()
