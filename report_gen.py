@@ -56,18 +56,27 @@ def build_report_query(
         'comp_master.category AS "Component Category"',
         'comp_master.description AS "Component Description"',
         'comp_master.manufacturer AS "Component Manufacturer"',
-        'b.quantity AS "Quantity in BOM"',
-        'COALESCE(inv.totalavailable, 0) AS "Available Quantity In Contract\'s Stock"',
-        'COALESCE(inspection.totalavailable, 0) AS "Quantity Pending Inspection"',
-        'COALESCE(comp_master.onorder, 0) AS "Quantity on Order"',
-        'COALESCE(kit.totalavailable, 0) AS "Quantity Kitted for Contract"'
+        'b.quantity AS "Quantity in BOM"'
     ]
+
+    if include_cost:
+        select_parts.append('comp_master.cost AS "Component Cost"')
+
+    select_parts.append('COALESCE(inv.totalavailable, 0) AS "Available Quantity In Contract\'s Stock"')
+
+    if include_inspection:
+        select_parts.append('COALESCE(inspection.totalavailable, 0) AS "Quantity Pending Inspection"')
+
+    if include_on_order:
+        select_parts.append('COALESCE(comp_master.onorder, 0) AS "Quantity on Order"')
+
+    if include_kitted:
+        select_parts.append('COALESCE(kit.totalavailable, 0) AS "Quantity Kitted for Contract"')
 
     if include_assembled:
         select_parts.append('COALESCE(assembled.totalavailable, 0) AS "Quantity in Assembled Assemblies"')
     
-    if include_cost:
-        select_parts.append('comp_master.cost AS "Component Cost"')
+    
 
     # ----------------------------
     # 2. Build availability expression
@@ -178,17 +187,22 @@ def build_report_query(
         'comp_master.waspnumber',
         'comp_master.description',
         'b.quantity',
-        'comp_master.cost',
         'comp_master.manufacturer',
         'comp_master.category',
-        'inv.totalavailable',
-        'comp_master.onorder',
-        'inspection.totalavailable',
-        'kit.totalavailable'
+        'inv.totalavailable'
     ]
 
     if include_assembled:
         group_by_parts.append('assembled.totalavailable')
+    if include_on_order:
+        group_by_parts.append('comp_master.onorder')
+    if include_inspection:
+        group_by_parts.append('inspection.totalavailable')
+    if include_kitted:
+        group_by_parts.append('kit.totalavailable')
+    if include_cost:
+        group_by_parts.append('comp_master.cost')
+    
 
     # ----------------------------
     # 5. Final query
