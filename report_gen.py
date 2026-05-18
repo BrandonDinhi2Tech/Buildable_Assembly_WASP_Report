@@ -101,23 +101,28 @@ def build_report_query(
     # ----------------------------
     contract_map = {
         'RGI35': {
-            'stock': 'RGI35 i2Tech Stock',
+            'stock': ['RGI35 i2Tech Stock'],
             'kit_patterns': ['%RGI35%', '%LV-L01%'],
             'assy_category': ['616-12 RGI35 i2AX(BLK2)']
         },
         'QIN05': {
-            'stock': 'QIN05-STK',
+            'stock': ['QIN05-STK'],
             'kit_patterns': ['%QIN05%'],
             'assy_category': ['910-02 i2DAS (QIN05, QIN11)']
         },
         'QIN11': {
-            'stock': 'QIN11-STK',
+            'stock': ['QIN11-STK'],
             'kit_patterns': ['%QIN11%'],
             'assy_category': ['910-02 i2DAS (QIN05, QIN11)']
         },
         'General': {
             'stock': 'SiteA',
             'kit_patterns': ['%SiteA%'],
+            'assy_category': ['910-02 i2DAS (QIN05, QIN11)', '616-12 RGI35 i2AX(BLK2)', '610-10 xxx i2ULS(BLK3)']
+        },
+        'All': {
+            'stock': ['RGI35 i2Tech Stock', 'QIN05-STK', 'QIN11-STK', 'SiteA'],
+            'kit_patterns': ['%RGI35%', '%LV-L01%', '%QIN05%', '%QIN11%', '%SiteA%'],
             'assy_category': ['910-02 i2DAS (QIN05, QIN11)', '616-12 RGI35 i2AX(BLK2)', '610-10 xxx i2ULS(BLK3)']
         }
     }
@@ -205,7 +210,7 @@ def build_report_query(
         LEFT JOIN (
             SELECT waspnumber, SUM(totalavailable) AS totalavailable, MAX(onorder) as onorder
             FROM items
-            WHERE sitename = %s
+            WHERE sitename = ANY(%s)
             GROUP BY waspnumber
         ) inv
             ON inv.waspnumber = comp_master.waspnumber

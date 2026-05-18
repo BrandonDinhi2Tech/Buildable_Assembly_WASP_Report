@@ -10,7 +10,7 @@ import threading
 import time
 
 class BuildableAssemblyWaspReportGenerator:
-    list_of_contracts = ['RGI35', 'QIN05', 'QIN11', 'General']
+    list_of_contracts = ['RGI35', 'QIN05', 'QIN11', 'General', 'All']
 
     def __init__(self, root):
         self.root = root
@@ -145,6 +145,7 @@ class BuildableAssemblyWaspReportGenerator:
 
     # refreshes database and optionally the assembly combobox as well
     def refresh_database(self, refresh_combobox):
+        # progress bar popup window
         popup = tk.Toplevel(self.root)
         popup.title("Database Refresh")
         popup.geometry("300x150")
@@ -154,6 +155,7 @@ class BuildableAssemblyWaspReportGenerator:
         pb.pack(pady=10)
         pb.start()
 
+        # database refresh is done on separate thread from all of the GUI updates to avoid freezing the GUI
         def do_work():
             try:
                 location.update_location_table()
@@ -175,6 +177,7 @@ class BuildableAssemblyWaspReportGenerator:
             except Exception as e:
                 self.root.after(0, lambda err=e: on_error(err))
 
+        # this updates the GUI after the database refresh is done successfully
         def on_success(display_values):
             pb.stop()
             pb.destroy()
@@ -186,12 +189,14 @@ class BuildableAssemblyWaspReportGenerator:
             ttk.Button(popup, text="OK", command=popup.destroy).pack(pady=5)
             self.last_refresh_label.config(text=f"Last refresh: {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
+        # this pops up an error message if the database refresh fails
         def on_error(e):
             pb.stop()
             pb.destroy()
             label.config(text=f"Failed to refresh database.")
             ttk.Button(popup, text="OK", command=popup.destroy).pack(pady=5)
 
+        # starts the multi-threaded database refresh
         threading.Thread(target=do_work, daemon=True).start()
 
     def report_gen_wrapper(self):
@@ -245,6 +250,9 @@ class BuildableAssemblyWaspReportGenerator:
 if __name__ == "__main__":
     root=ttkbootstrap.Window(themename="flatly")
     app = BuildableAssemblyWaspReportGenerator(root)
+    root.lift()
+    root.attributes('-topmost', True)
+    root.after_idle(root.attributes, '-topmost', False)
     root.mainloop()
 
     # ----------------------------- unit test -------------------------------------
