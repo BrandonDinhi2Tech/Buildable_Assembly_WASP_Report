@@ -23,6 +23,11 @@ class BuildableAssemblyWaspReportGenerator:
         root.rowconfigure(0, weight=1)
         mainframe.columnconfigure(1, weight=1)
 
+        # attempt to make all fonts size 12, see __main__ for more font size changes (ttkbootstrap requires a different way of setting the font)
+        combobox_font = tk.font.Font(family="Segoe UI",size=12)
+        root.option_add("*Font", combobox_font)
+ 
+
         # Title
         title = ttk.Label(
             mainframe,
@@ -106,7 +111,7 @@ class BuildableAssemblyWaspReportGenerator:
         self.browse_output_folder_button = ttk.Button(
             output_frame,
             text="Browse",
-            command=self.browse_output_folder
+            command=self.browse_output_folder            
         )
         self.browse_output_folder_button.grid(row=0, column=2, padx=5)
 
@@ -117,7 +122,7 @@ class BuildableAssemblyWaspReportGenerator:
         self.refresh_database_button = ttk.Button(
             action_frame,
             text="Refresh Database",
-            command=lambda: self.refresh_database(refresh_combobox=True)
+            command=lambda: self.refresh_database(refresh_combobox=True)            
         )
         self.refresh_database_button.grid(row=0, column=0, padx=5)
 
@@ -149,7 +154,7 @@ class BuildableAssemblyWaspReportGenerator:
         popup = tk.Toplevel(self.root)
         popup.title("Database Refresh")
         popup.geometry("300x150")
-        label = ttk.Label(popup, text="Refreshing database, please wait...")
+        label = ttk.Label(popup, text="Refreshing database, please wait...", font=("Segoe UI", 12))
         label.pack(pady=10)
         pb = ttk.Progressbar(popup, orient='horizontal', mode='indeterminate', length=280)
         pb.pack(pady=10)
@@ -194,7 +199,7 @@ class BuildableAssemblyWaspReportGenerator:
             pb.stop()
             pb.destroy()
             label.config(text=f"Failed to refresh database.")
-            ttk.Button(popup, text="OK", command=popup.destroy).pack(pady=5)
+            ttk.Button(popup, text="OK", command=popup.destroy, ).pack(pady=5)
 
         # starts the multi-threaded database refresh
         threading.Thread(target=do_work, daemon=True).start()
@@ -249,6 +254,13 @@ class BuildableAssemblyWaspReportGenerator:
 
 if __name__ == "__main__":
     root=ttkbootstrap.Window(themename="flatly")
+
+    style = ttkbootstrap.Style()
+    style.configure('TButton', font=('Segoe UI', 12))
+    style.configure('TLabel', font=('Segoe UI', 12))
+    style.configure('TCheckbutton', font=('Segoe UI', 12))
+    style.configure('TLabelframe.Label', font=('Segoe UI', 10))
+
     app = BuildableAssemblyWaspReportGenerator(root)
     root.lift()
     root.attributes('-topmost', True)
