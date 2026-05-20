@@ -2,12 +2,13 @@ import item
 import assembly
 import location
 import report_gen
+import settings
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import os
 import ttkbootstrap
 import threading
-import time
+import datetime
 
 class BuildableAssemblyWaspReportGenerator:
     list_of_contracts = ['RGI35', 'QIN05', 'QIN11', 'General', 'All']
@@ -133,8 +134,11 @@ class BuildableAssemblyWaspReportGenerator:
         )
         self.generate_report_button.grid(row=0, column=1, padx=5)
 
-        self.last_refresh_label = ttk.Label(action_frame, text="Last refresh: Never")
+        self.last_refresh_label = ttk.Label(action_frame)
         self.last_refresh_label.grid(row=1, column=0, columnspan=2, pady=(10, 0))
+        ts = settings.database_refresh_timestamp()
+        display = ts.strftime('%Y-%m-%d %H:%M:%S') if ts else "Never"
+        self.last_refresh_label.config(text=f"Last refresh: {display}")
 
         # Apply consistent padding
         for child in mainframe.winfo_children():
@@ -192,7 +196,8 @@ class BuildableAssemblyWaspReportGenerator:
                     self.assembly_combobox.current(0)
             label.config(text="Database refreshed successfully!")
             ttk.Button(popup, text="OK", command=popup.destroy).pack(pady=5)
-            self.last_refresh_label.config(text=f"Last refresh: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+            settings.save_refresh_timestamp()
+            self.last_refresh_label.config(text=f"Last refresh: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
         # this pops up an error message if the database refresh fails
         def on_error(e):
