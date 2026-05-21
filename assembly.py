@@ -83,6 +83,7 @@ def update_bom_table():
         # each component of an assembly will get an entry into this table as a component_item_id, with the corresponding parent id
         # the cost will be the cost of the component in the context of being inside its particular parent
         # so if for example one item is in multiple assemblies, it will have multiple entries in this table with different parent ids and potentially different costs
+        # TODO: the WASP API is broken, getting the costs of each of the components in a BOM doesn't work. Falling back to the cost of the item listed in its item page for now until they fix
         create_bom = """
         CREATE TABLE bom (
             parent_item_id INTEGER NOT NULL REFERENCES items(id),

@@ -3,6 +3,7 @@ import assembly
 import location
 import report_gen
 import settings
+import presets
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import os
@@ -116,9 +117,29 @@ class BuildableAssemblyWaspReportGenerator:
         )
         self.browse_output_folder_button.grid(row=0, column=2, padx=5)
 
+        # ------------------ Presets ------------------
+        presets_frame = ttk.LabelFrame(mainframe, text="Presets", padding=10)
+        presets_frame.grid(row = 5, column=0, columnspan=3, sticky="ew", pady=5)
+        presets_frame.columnconfigure(1, weight=1)
+
+        self.preset_combobox = ttk.Combobox(presets_frame, width=30, state="readonly")
+        self.preset_combobox.grid(row=0, column=0, sticky="ew", padx=(0, 10))
+
+        ttk.Button(presets_frame, text="Load", command=self.load_preset).grid(row=0, column=1, sticky="ew", padx=2)
+        ttk.Button(presets_frame, text="Save", command=self.save_preset).grid(row=0, column=2, sticky="ew", padx=2)
+        ttk.Button(presets_frame, text="Delete", command=self.delete_preset).grid(row=0, column=3, sticky="ew", padx=2)
+
+        # stretch each column to fill space evenly
+        presets_frame.columnconfigure(0, weight=3)
+        presets_frame.columnconfigure(1, weight=1)
+        presets_frame.columnconfigure(2, weight=1)
+        presets_frame.columnconfigure(3, weight=1)
+
+        self.refresh_preset_list()
+
         # ------------------ Actions ------------------
         action_frame = ttk.Frame(mainframe)
-        action_frame.grid(row=5, column=0, columnspan=3, pady=15)
+        action_frame.grid(row=6, column=0, columnspan=3, pady=15)
 
         self.refresh_database_button = ttk.Button(
             action_frame,
@@ -196,6 +217,7 @@ class BuildableAssemblyWaspReportGenerator:
                     self.assembly_combobox.current(0)
             label.config(text="Database refreshed successfully!")
             ttk.Button(popup, text="OK", command=popup.destroy).pack(pady=5)
+            # update timestamp for last database refresh
             settings.save_refresh_timestamp()
             self.last_refresh_label.config(text=f"Last refresh: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
@@ -257,9 +279,78 @@ class BuildableAssemblyWaspReportGenerator:
         except Exception as e:
             messagebox.showerror('Failed to generate report', str(e))
 
+    # return a dictionary containing the current options selected by the user in the UI
+    def _current_options(self):
+        """Snapshot of all current widget values."""
+        return {
+            "assembly_id":        self.assembly_combobox.get(),
+            "contract":           self.contract_combobox.get(),
+            "include_inspection": self.include_inspection.get(),
+            "include_on_order":   self.include_on_order.get(),
+            "include_kitted":     self.include_kitted.get(),
+            "include_assembled":  self.include_assembled.get(),
+            "include_cost":       self.include_cost.get(),
+            "desired_amount":     int(self.desired_amount_entry.get()) if self.desired_amount_entry.get().strip() else None,
+        }
+
+    # wrapper for the presets.load_presets() function
+    def refresh_preset_list(self):
+        self.preset_list = presets.load_presets()
+        self.preset_combobox['values'] = [p['name'] for p in self.preset_list]
+        if self.preset_list:
+            self.preset_combobox.current(0)
+        else:
+            self.preset_combobox.set('')
+
+    # wrapper for the presets.save_preset() function
+    def save_preset(self):
+        name = tk.simpledialog.askstring("Save Preset", "Enter a name for this preset:")
+        if not name:
+            return
+        try:
+            presets.save_preset(name, self._current_options())
+            self.refresh_preset_list()
+            self.preset_combobox.set(name)
+            messagebox.showinfo("Preset Saved", f"Preset '{name}' saved.")
+        except Exception as e:
+            messagebox.showerror("Error saving preset", str(e))
+
+    # sets the options selected in the UI to the ones specified in the preset
+    def load_preset(self):
+        idx = self.preset_combobox.current()
+        if idx == -1:
+            messagebox.showwarning("No preset selected", "Please select a preset to load.")
+            return
+        p = self.preset_list[idx]
+        self.assembly_combobox.set(p['assembly_id'])
+        self.contract_combobox.set(p['contract'])
+        self.include_inspection.set(p['include_inspection'])
+        self.include_on_order.set(p['include_on_order'])
+        self.include_kitted.set(p['include_kitted'])
+        self.include_assembled.set(p['include_assembled'])
+        self.include_cost.set(p['include_cost'])
+        self.desired_amount_entry.delete(0, tk.END)
+        if p['desired_amount'] is not None:
+            self.desired_amount_entry.insert(0, str(p['desired_amount']))
+
+    # wrapper for presets.delete_preset() function
+    def delete_preset(self):
+        idx = self.preset_combobox.current()
+        if idx == -1:
+            messagebox.showwarning("No preset selected", "Please select a preset to delete.")
+            return
+        name = self.preset_list[idx]['name']
+        confirm = messagebox.askyesno("Delete Preset", f"Delete preset '{name}'?")
+        if confirm:
+            presets.delete_preset(name)
+            self.refresh_preset_list()
+
 if __name__ == "__main__":
     root=ttkbootstrap.Window(themename="flatly")
 
+    presets.create_default_presets() # makes the default presets that every user will have on startup
+
+    # setting font sizes across the UI
     style = ttkbootstrap.Style()
     style.configure('TButton', font=('Segoe UI', 12))
     style.configure('TLabel', font=('Segoe UI', 12))
@@ -267,9 +358,12 @@ if __name__ == "__main__":
     style.configure('TLabelframe.Label', font=('Segoe UI', 10))
 
     app = BuildableAssemblyWaspReportGenerator(root)
+
+    # bring app to the front, then allow it to go to the background if the user wishes
     root.lift()
     root.attributes('-topmost', True)
     root.after_idle(root.attributes, '-topmost', False)
+    
     root.mainloop()
 
     # ----------------------------- unit test -------------------------------------

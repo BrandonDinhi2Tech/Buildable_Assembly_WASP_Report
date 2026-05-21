@@ -19,8 +19,6 @@ def location_api_call(location_search_term=None, site_search_term=None):
     }
 
     response = requests.request("POST", url, headers=headers, data=payload)
-    # assembly_details = response.text
-    # print(assembly_details)
     return response.json()
 
 # make a location table with all of the locations in WASP, their sites, and their descriptions
