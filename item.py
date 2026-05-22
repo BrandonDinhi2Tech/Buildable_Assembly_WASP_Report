@@ -117,3 +117,28 @@ def inventory_to_database(df):
     finally:
         cursor.close()
         conn.close()
+        
+def get_item_cost(waspnumber, conn=None):
+    if conn is None:
+        conn=create_db_conn()
+        close_after = True
+    else:
+        close_after = False
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+                SELECT cost
+                FROM items
+                WHERE waspnumber = %s
+                ORDER BY waspnumber LIMIT 1;
+            """
+        , (waspnumber,))
+        row = cursor.fetchone()[0]
+        return row
+    
+    finally:
+        if close_after:
+            cursor.close()
+            conn.close()

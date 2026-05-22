@@ -1,4 +1,5 @@
 from db import create_db_conn
+import item
 import pandas as pd
 from datetime import datetime
 from openpyxl.formatting.rule import CellIsRule
@@ -365,6 +366,11 @@ def create_report(
         cursor.execute("SELECT description FROM items WHERE waspnumber = %s LIMIT 1;", (assembly_num,))
         assembly_description = cursor.fetchone()[0]
 
+        # getting cost of the assembly for the title page if cost was chosen to be included
+        if include_cost:
+            assembly_cost = item.get_item_cost(assembly_num, conn)
+
+
         # output sql query to excel spreadsheet
         with pd.ExcelWriter(full_path, engine="openpyxl") as writer:
             ws = writer.book.create_sheet(title="Title Page")
@@ -372,6 +378,9 @@ def create_report(
             ws.cell(row=2, column=1, value=f"BOM: {assembly_num}")
             ws.cell(row=3, column=1, value=f"Desc: {assembly_description}")
             ws.cell(row=4, column=1, value=f"Buildable Units: {assembly_buildable}")
+
+            if include_cost:
+                ws.cell(row=5, column=1, value=f"Cost of BOM: {assembly_cost}")
 
             ws.cell(row=1, column=2, value=f"Date: {datetime.now()}")
             df.to_excel(writer, index=False, sheet_name="Report")
