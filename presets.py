@@ -47,6 +47,17 @@ DEFAULT_PRESETS = [
         "include_assembled": False,
         "include_cost": True,
         "desired_amount": None
+    },
+    {
+        "name": "QIN11 Including Inspection, Kitted, Cost",
+        "assembly_id": "X91002 - 910-02 i2DAS BOM by item",
+        "contract": "QIN11", 
+        "include_inspection": True,
+        "include_on_order": False,
+        "include_kitted": True,
+        "include_assembled": False,
+        "include_cost": True,
+        "desired_amount": None
     }
 ]
 
