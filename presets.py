@@ -5,7 +5,8 @@ from db import create_db_conn
 # TODO: make more default presets
 DEFAULT_PRESETS = [
     {
-        "name": "RGI35 Including Inspection, Kitted, Cost",
+        "name": "RGI35 Including Inspection, Kitted, Cost",\
+        "unit_type": 'i2AX(BLK2) 616-12',
         "assembly_id": "X61612 - 616-12 i2AX(BLK2) BOM by item",
         "contract": "RGI35",
         "include_inspection": True,
@@ -17,6 +18,7 @@ DEFAULT_PRESETS = [
     },
     {
         "name": "RGI35 Major Parts Including Inspection, Kitted, Cost",
+        "unit_type": 'i2AX(BLK2) 616-12',
         "assembly_id": "A61612 - i2AX(BLK2) Gimbal Major Parts Including Housing",
         "contract": "RGI35", 
         "include_inspection": True,
@@ -28,6 +30,7 @@ DEFAULT_PRESETS = [
     },
     {
         "name": "QIN11 Major Parts Including Inspection, Kitted, Cost",
+        "unit_type": 'i2DAS 910-02',
         "assembly_id": "A91002 - Major items for i2DAS QIN05 QIN11",
         "contract": "QIN11", 
         "include_inspection": True,
@@ -39,6 +42,7 @@ DEFAULT_PRESETS = [
     },
     {
         "name": "QIN11 Housing Including Inspection, Kitted, Cost",
+        "unit_type": 'i2DAS 910-02',
         "assembly_id": "C91002 - Housing Items for i2DAS QIN05 QIN11",
         "contract": "QIN11", 
         "include_inspection": True,
@@ -50,6 +54,7 @@ DEFAULT_PRESETS = [
     },
     {
         "name": "QIN11 Including Inspection, Kitted, Cost",
+        "unit_type": 'i2DAS 910-02',
         "assembly_id": "X91002 - 910-02 i2DAS BOM by item",
         "contract": "QIN11", 
         "include_inspection": True,
@@ -68,6 +73,7 @@ def ensure_table(conn):
             CREATE TABLE IF NOT EXISTS presets (
                 id SERIAL PRIMARY KEY,
                 name TEXT UNIQUE NOT NULL,
+                unit_type TEXT,
                 assembly_id TEXT,
                 contract TEXT, 
                 include_inspection BOOLEAN,
@@ -95,15 +101,16 @@ def save_preset(name, preset: dict, conn=None):
         cursor.execute(
             """
                 INSERT INTO presets (
-                    name, assembly_id, contract, include_inspection, include_on_order,
+                    name, unit_type, assembly_id, contract, include_inspection, include_on_order,
                     include_kitted, include_assembled, include_cost, desired_amount
                 )
                 VALUES (
-                    %(name)s, %(assembly_id)s, %(contract)s, %(include_inspection)s,
+                    %(name)s, %(unit_type)s, %(assembly_id)s, %(contract)s, %(include_inspection)s,
                     %(include_on_order)s, %(include_kitted)s, %(include_assembled)s,
                     %(include_cost)s, %(desired_amount)s
                 )
                 ON CONFLICT (name) DO UPDATE SET
+                    unit_type = EXCLUDED.unit_type,
                     assembly_id = EXCLUDED.assembly_id,
                     contract = EXCLUDED.contract,
                     include_inspection = EXCLUDED.include_inspection,
@@ -168,17 +175,18 @@ def create_default_presets(conn=None):
         for p in DEFAULT_PRESETS:
             cursor.execute(
                 """INSERT INTO presets (
-                    name, assembly_id, contract, include_inspection, include_on_order,
+                    name, unit_type, assembly_id, contract, include_inspection, include_on_order,
                     include_kitted, include_assembled, include_cost, desired_amount
                 )
                 VALUES (
-                    %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s,
                     %s, %s, %s,
                     %s, %s
                 )
                 ON CONFLICT (name) DO NOTHING;
             """, (
                 p['name'],
+                p['unit_type'],
                 p['assembly_id'],
                 p['contract'],
                 p['include_inspection'],

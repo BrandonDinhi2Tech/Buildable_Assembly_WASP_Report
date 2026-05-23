@@ -12,7 +12,8 @@ import threading
 import datetime
 
 class BuildableAssemblyWaspReportGenerator:
-    list_of_contracts = ['RGI35', 'QIN05', 'QIN11', 'General', 'All']
+    list_of_contracts = ['RGI35', 'QIN05', 'QIN11', 'General Stock', 'All']
+    list_of_units = ['i2AX(BLK2) 616-12', 'i2DAS 910-02']
 
     def __init__(self, root):
         self.root = root
@@ -41,22 +42,40 @@ class BuildableAssemblyWaspReportGenerator:
         # Refresh DB initially
         self.refresh_database(refresh_combobox=False)
 
+        # ------------------ Unit Selection Frame --------------
+        unit_selection_frame = ttk.LabelFrame(mainframe, text="Unit Selection", padding = 10)
+        unit_selection_frame.grid(row=1, column=0, columnspan=3, sticky="ew", pady=5)
+        unit_selection_frame.columnconfigure(1, weight=1)
+
+        ttk.Label(unit_selection_frame, text="Unit Type:").grid(row=0, column=0, sticky="e")
+        self.unit_combobox = ttk.Combobox(unit_selection_frame, width=50, state="readonly")
+        self.unit_combobox['values'] = self.list_of_units
+        if self.list_of_units:
+            self.unit_combobox.current(0)
+        self.unit_combobox.grid(row=0, column=1, sticky="ew")
+
+        self.unit_combobox.bind("<<ComboboxSelected>>", self.on_unit_type_changed)
+
+
         # ------------------ Selection Frame ------------------
         selection_frame = ttk.LabelFrame(mainframe, text="Selection", padding=10)
-        selection_frame.grid(row=1, column=0, columnspan=3, sticky="ew", pady=5)
+        selection_frame.grid(row=2, column=0, columnspan=3, sticky="ew", pady=5)
         selection_frame.columnconfigure(1, weight=1)
 
         ttk.Label(selection_frame, text="Assembly:").grid(row=0, column=0, sticky="e")
         self.assembly_combobox = ttk.Combobox(selection_frame, width=50, state="readonly")
 
         try:
-            self.assembly_list = assembly.get_assy_wasp_and_desc()
+            unit_type = self.get_unit_type()
+            print(f"unit_type value: {unit_type}, type: {type(unit_type)}")
+            self.assembly_list = assembly.get_assy_wasp_and_desc(unit_type)
             display_values = [
                 f"{a['waspnumber']} - {a['description']}"
                 for a in self.assembly_list
             ]
         except Exception as e:
             messagebox.showerror("Failed getting assembly list", str(e))
+            print("Failed getting assembly list", str(e))
             display_values = []
             self.assembly_list = []
 
@@ -74,7 +93,7 @@ class BuildableAssemblyWaspReportGenerator:
 
         # ------------------ Options Frame ------------------
         options_frame = ttk.LabelFrame(mainframe, text="Availability Options", padding=10)
-        options_frame.grid(row=2, column=0, columnspan=3, sticky="ew", pady=5)
+        options_frame.grid(row=3, column=0, columnspan=3, sticky="ew", pady=5)
 
         self.include_inspection = tk.BooleanVar()
         ttk.Checkbutton(options_frame, text="Include Inspection Quantity", variable=self.include_inspection).grid(row=0, column=0, sticky="w")
@@ -90,7 +109,7 @@ class BuildableAssemblyWaspReportGenerator:
 
         # ------------------ Settings Frame ------------------
         settings_frame = ttk.LabelFrame(mainframe, text="Settings", padding=10)
-        settings_frame.grid(row=3, column=0, columnspan=3, sticky="ew", pady=5)
+        settings_frame.grid(row=4, column=0, columnspan=3, sticky="ew", pady=5)
         settings_frame.columnconfigure(1, weight=1)
 
         ttk.Label(settings_frame, text="Desired Units:").grid(row=0, column=0, sticky="e")
@@ -102,7 +121,7 @@ class BuildableAssemblyWaspReportGenerator:
 
         # ------------------ Output Frame ------------------
         output_frame = ttk.LabelFrame(mainframe, text="Output", padding=10)
-        output_frame.grid(row=4, column=0, columnspan=3, sticky="ew", pady=5)
+        output_frame.grid(row=5, column=0, columnspan=3, sticky="ew", pady=5)
         output_frame.columnconfigure(1, weight=1)
 
         ttk.Label(output_frame, text="Output Directory:").grid(row=0, column=0, sticky="e")
@@ -119,7 +138,7 @@ class BuildableAssemblyWaspReportGenerator:
 
         # ------------------ Presets ------------------
         presets_frame = ttk.LabelFrame(mainframe, text="Presets", padding=10)
-        presets_frame.grid(row = 5, column=0, columnspan=3, sticky="ew", pady=5)
+        presets_frame.grid(row = 6, column=0, columnspan=3, sticky="ew", pady=5)
         presets_frame.columnconfigure(1, weight=1)
 
         self.preset_combobox = ttk.Combobox(presets_frame, width=30, state="readonly")
@@ -139,7 +158,7 @@ class BuildableAssemblyWaspReportGenerator:
 
         # ------------------ Actions ------------------
         action_frame = ttk.Frame(mainframe)
-        action_frame.grid(row=6, column=0, columnspan=3, pady=15)
+        action_frame.grid(row=7, column=0, columnspan=3, pady=15)
 
         self.refresh_database_button = ttk.Button(
             action_frame,
@@ -165,13 +184,40 @@ class BuildableAssemblyWaspReportGenerator:
         for child in mainframe.winfo_children():
             child.grid_configure(padx=5, pady=5)
 
-
+    # ----------------------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------------------
+    # ------------------------------ END OF UI -----------------------------------------------
+    # ----------------------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------------------
 
     # brings up folder selection dialog
     def browse_output_folder(self):
         folder_selected = filedialog.askdirectory()
         if folder_selected:
             self.output_folder.set(folder_selected)
+        
+    # gets the type of unit that the user wants to filter for in the assembly list
+    def get_unit_type(self):
+        unit_type = self.unit_combobox.get()
+        unit_search_terms = ["%" + term + "%" for term in unit_type.split()]
+        return unit_search_terms
+
+    # updates the assembly combobox whenever the unit combobox is selected
+    def on_unit_type_changed(self, event=None):
+        try:
+            unit_type = self.get_unit_type()
+            self.assembly_list = assembly.get_assy_wasp_and_desc(unit_type=unit_type)
+            display_values = [
+                f"{a['waspnumber']} - {a['description']}"
+                for a in self.assembly_list
+            ]
+            self.assembly_combobox['values'] = display_values
+            if self.assembly_list:
+                self.assembly_combobox.current(0)
+            else:
+                self.assembly_combobox.set('')
+        except Exception as e:
+            messagebox.showerror("Failed to update assembly list", str(e))
 
     # refreshes database and optionally the assembly combobox as well
     def refresh_database(self, refresh_combobox):
@@ -195,7 +241,9 @@ class BuildableAssemblyWaspReportGenerator:
                 display_values = []
                 if refresh_combobox:
                     try:
-                        self.assembly_list = assembly.get_assy_wasp_and_desc()
+                        unit_type = self.get_unit_type()
+                        print(f"unit_type value: {unit_type}, type: {type(unit_type)}")
+                        self.assembly_list = assembly.get_assy_wasp_and_desc(unit_type)
                         display_values = [
                             f"{a['waspnumber']} - {a['description']}"
                             for a in self.assembly_list
@@ -231,6 +279,7 @@ class BuildableAssemblyWaspReportGenerator:
         # starts the multi-threaded database refresh
         threading.Thread(target=do_work, daemon=True).start()
 
+    # handles the report generation within the UI
     def report_gen_wrapper(self):
         index = self.assembly_combobox.current()
         if index == -1:
@@ -283,6 +332,7 @@ class BuildableAssemblyWaspReportGenerator:
     def _current_options(self):
         """Snapshot of all current widget values."""
         return {
+            "unit_type":          self.unit_combobox.get(),
             "assembly_id":        self.assembly_combobox.get(),
             "contract":           self.contract_combobox.get(),
             "include_inspection": self.include_inspection.get(),
@@ -322,6 +372,8 @@ class BuildableAssemblyWaspReportGenerator:
             messagebox.showwarning("No preset selected", "Please select a preset to load.")
             return
         p = self.preset_list[idx]
+        self.unit_combobox.set(p['unit_type'])
+        self.on_unit_type_changed() # update assembly combobox to match unit type
         self.assembly_combobox.set(p['assembly_id'])
         self.contract_combobox.set(p['contract'])
         self.include_inspection.set(p['include_inspection'])
@@ -363,7 +415,7 @@ if __name__ == "__main__":
     root.lift()
     root.attributes('-topmost', True)
     root.after_idle(root.attributes, '-topmost', False)
-    
+
     root.mainloop()
 
     # ----------------------------- unit test -------------------------------------

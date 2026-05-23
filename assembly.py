@@ -42,7 +42,7 @@ def get_all_assemblies(conn=None):
             conn.close()
 
 # gets a concatenation of the wasp number of an assembly and its description for the UI
-def get_assy_wasp_and_desc(conn=None):
+def get_assy_wasp_and_desc(unit_type=None, conn=None):
     if conn is None:
         conn=create_db_conn()
         close_after = True
@@ -51,12 +51,16 @@ def get_assy_wasp_and_desc(conn=None):
 
     try:
         cursor = conn.cursor()
+        params = (
+            ['8%', '9%', 'A%', 'B%', 'C%', 'X%'],
+            unit_type if unit_type else ['%']
+        )
         cursor.execute("""
                         SELECT DISTINCT waspnumber, description
                         FROM items
-                        WHERE type = 'Assembly' AND waspnumber LIKE ANY(%s)
+                        WHERE type = 'Assembly' AND waspnumber LIKE ANY(%s) AND category LIKE ANY(%s)
                         ORDER BY waspnumber;
-                    """, [['8%', '9%', 'A%', 'B%', 'C%', 'X%']]) # only gets assemblies that are subassemblies or assemblies of units (no standalone items that are considered as assemblies since they are combinataions of a few other items)
+                    """, params)
         rows = cursor.fetchall()
 
         assembly_list = [

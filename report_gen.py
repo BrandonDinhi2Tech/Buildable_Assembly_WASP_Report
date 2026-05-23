@@ -125,7 +125,7 @@ def build_report_query(
             'kit_patterns': ['%QIN11%'],
             'assy_category': ['910-02 i2DAS (QIN05, QIN11)']
         },
-        'General': {
+        'General Stock': {
             'stock': 'SiteA',
             'kit_patterns': ['%SiteA%'],
             'assy_category': ['910-02 i2DAS (QIN05, QIN11)', '616-12 RGI35 i2AX(BLK2)', '610-10 xxx i2ULS(BLK3)']
