@@ -279,6 +279,45 @@ class BuildableAssemblyWaspReportGenerator:
         # starts the multi-threaded database refresh
         threading.Thread(target=do_work, daemon=True).start()
 
+    # return a dictionary containing the current options selected by the user in the UI
+    def _current_options(self):
+        # Snapshot of all current widget values
+        return {
+            "unit_type":          self.unit_combobox.get(),
+            "assembly_id":        self.assembly_combobox.get(),
+            "contract":           self.contract_combobox.get(),
+            "include_inspection": self.include_inspection.get(),
+            "include_on_order":   self.include_on_order.get(),
+            "include_kitted":     self.include_kitted.get(),
+            "include_assembled":  self.include_assembled.get(),
+            "include_cost":       self.include_cost.get(),
+            "desired_amount":     int(self.desired_amount_entry.get()) if self.desired_amount_entry.get().strip() else None,
+        }
+
+    def get_active_preset_name(self):
+        # Returns the preset name if the current options match it, otherwise None
+        idx = self.preset_combobox.current()
+        if idx == -1:
+            return None
+        
+        p = self.preset_list[idx]
+        current = self._current_options()
+
+        if (
+            p['unit_type']          == current['unit_type']          and
+            p['assembly_id']        == current['assembly_id']        and
+            p['contract']           == current['contract']           and
+            p['include_inspection'] == current['include_inspection'] and
+            p['include_on_order']   == current['include_on_order']   and
+            p['include_kitted']     == current['include_kitted']     and
+            p['include_assembled']  == current['include_assembled']  and
+            p['include_cost']       == current['include_cost']       and
+            p['desired_amount']     == current['desired_amount']
+        ):
+            return p['name']
+        
+        return None
+
     # handles the report generation within the UI
     def report_gen_wrapper(self):
         index = self.assembly_combobox.current()
@@ -300,6 +339,8 @@ class BuildableAssemblyWaspReportGenerator:
         else:
             desired_amount = int(desired_amount)
 
+        preset_name = self.get_active_preset_name() # get preset name if the preset is actually selected
+
         try:
             if desired_amount is None:
                 report_gen.create_report(assembly_num=waspnumber, 
@@ -310,7 +351,8 @@ class BuildableAssemblyWaspReportGenerator:
                                         include_kitted=self.include_kitted.get(),
                                         output_directory=output_dir,
                                         list_of_contracts=self.list_of_contracts,
-                                        include_assembled=self.include_assembled.get()
+                                        include_assembled=self.include_assembled.get(),
+                                        preset_name = preset_name
                                         )
             else:
                 report_gen.create_report(assembly_num=waspnumber, 
@@ -322,26 +364,12 @@ class BuildableAssemblyWaspReportGenerator:
                                         include_kitted=self.include_kitted.get(),
                                         output_directory=output_dir,
                                         list_of_contracts=self.list_of_contracts,
-                                        include_assembled=self.include_assembled.get()
+                                        include_assembled=self.include_assembled.get(),
+                                        preset_name = preset_name
                                         )
             messagebox.showinfo(title='Generate Report', message=f"Generated report successfully at {output_dir}")
         except Exception as e:
             messagebox.showerror('Failed to generate report', str(e))
-
-    # return a dictionary containing the current options selected by the user in the UI
-    def _current_options(self):
-        """Snapshot of all current widget values."""
-        return {
-            "unit_type":          self.unit_combobox.get(),
-            "assembly_id":        self.assembly_combobox.get(),
-            "contract":           self.contract_combobox.get(),
-            "include_inspection": self.include_inspection.get(),
-            "include_on_order":   self.include_on_order.get(),
-            "include_kitted":     self.include_kitted.get(),
-            "include_assembled":  self.include_assembled.get(),
-            "include_cost":       self.include_cost.get(),
-            "desired_amount":     int(self.desired_amount_entry.get()) if self.desired_amount_entry.get().strip() else None,
-        }
 
     # wrapper for the presets.load_presets() function
     def refresh_preset_list(self):

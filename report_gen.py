@@ -310,7 +310,8 @@ def create_report(
     include_cost=False, 
     desired_amount=None,
     list_of_contracts=None,
-    include_assembled=False
+    include_assembled=False,
+    preset_name=None
 ):
 
     # depending on the contract, the site that you can pull parts from changes
@@ -347,6 +348,11 @@ def create_report(
                                         include_kitted=include_kitted,
                                         desired_amount=desired_amount,
                                         include_assembled=include_assembled)
+        
+        # if a preset is actually selected, then use it as the file name
+        if preset_name:
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+            file_name = f" {timestamp} " + preset_name + ".xlsx"
         
         # accounting for the user's chosen output directory
         if output_directory:
