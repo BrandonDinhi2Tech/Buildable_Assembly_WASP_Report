@@ -379,26 +379,28 @@ def create_report(
 
         # output sql query to excel spreadsheet
         with pd.ExcelWriter(full_path, engine="openpyxl") as writer:
-            ws = writer.book.create_sheet(title="Title Page")
-            ws.cell(row=1, column=1, value=f"WASP Buildable Report {report_title_flags}")
-            ws.cell(row=2, column=1, value=f"BOM: {assembly_num}")
-            ws.cell(row=3, column=1, value=f"Desc: {assembly_description}")
-            ws.cell(row=4, column=1, value=f"Buildable Units: {assembly_buildable}")
+            ws_title = writer.book.create_sheet(title="Title Page")
+            ws_title.cell(row=1, column=1, value=f"WASP Buildable Report {report_title_flags}")
+            ws_title.cell(row=2, column=1, value=f"BOM: {assembly_num}")
+            ws_title.cell(row=3, column=1, value=f"Desc: {assembly_description}")
+            ws_title.cell(row=4, column=1, value=f"Buildable Units: {assembly_buildable}")
 
             if include_cost:
-                ws.cell(row=5, column=1, value=f"Cost of BOM: {assembly_cost}")
+                ws_title.cell(row=5, column=1, value=f"Cost of BOM: ")
+                bom_cost_cell = ws_title.cell(row=5, column=2, value=assembly_cost)
+                bom_cost_cell.number_format = '"$"#,##0.00' # formatting bom cost into dollars
 
-            ws.cell(row=1, column=2, value=f"Date: {datetime.now()}")
+            ws_title.cell(row=1, column=2, value=f"Date: {datetime.now()}")
             df.to_excel(writer, index=False, sheet_name="Report")
 
             # highlighting cells that are short in red
-            ws = writer.book["Report"]
+            ws_report = writer.book["Report"]
 
             target_header = "Available-Desired Quantity"
 
             # trying to find available-desired quantity column
             col_idx = None
-            for cell in ws[1]:
+            for cell in ws_report[1]:
                 if cell.value == target_header:
                     col_idx = cell.column
                     break
@@ -409,7 +411,7 @@ def create_report(
                 col_letter = get_column_letter(col_idx)
                 max_row = len(df) + 1
 
-                ws.conditional_formatting.add(
+                ws_report.conditional_formatting.add(
                     f"{col_letter}2:{col_letter}{max_row}",
                     CellIsRule(
                         operator="lessThan",
@@ -417,6 +419,31 @@ def create_report(
                         fill=PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid"),
                     )
                 )
+            
+            target_header = "Component Cost"
+
+            # trying to find component cost column
+            col_idx = None
+            for cell in ws_report[1]:
+                if cell.value == target_header:
+                    col_idx = cell.column
+                    break
+
+            # formatting all costs to currency format in dollars
+            if col_idx:
+                col_letter = get_column_letter(col_idx)
+                max_row = len(df) + 1
+
+                for row in range(2, max_row+1):
+                    cell = ws_report[f"{col_letter}{row}"]
+                    cell.number_format = '"$"#,##0.00'
+
+            # autofitting all columns to largest width entry in that column
+            for ws in [ws_title, ws_report]:
+                for col in ws.columns:
+                    col_letter = col[0].column_letter
+                    max_len = max(len(str(cell.value or '')) for cell in col)
+                    ws.column_dimensions[col_letter].width = max_len + 3
 
 
         cursor.close()
