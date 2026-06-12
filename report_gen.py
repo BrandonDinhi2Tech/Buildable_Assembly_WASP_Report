@@ -34,7 +34,7 @@ def build_report_query(
 
                     JOIN items root_item
                     ON root_item.id = b.parent_item_id
-                    WHERE root_item.category = ANY(%s)
+                    WHERE root_item.category = ANY(%s) OR root_item.sitename = ANY(%s) OR root_item.locationcode LIKE ANY(%s)
 
                     UNION ALL
 
@@ -145,7 +145,9 @@ def build_report_query(
     assy_category = contract_map[contract]['assy_category']
 
     if include_assembled:
-        params.append(assy_category)
+        params.append(assy_category) # root_item.category
+        params.append(stock_site) # root_item.sitename
+        params.append(kit_patterns) # root_item.location
     if desired_amount:
         params.append(desired_amount)
     params.append(stock_site)
