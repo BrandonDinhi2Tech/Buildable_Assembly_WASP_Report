@@ -1,13 +1,20 @@
 from db import create_db_conn
+from assembly import get_assy_wasp_and_desc
 
 # this list stores the default presets
 # TODO: make a BOM for the entire i2DAS and then make a preset for it
 # TODO: make more default presets
+def get_specific_assembly_and_desc(assembly_id, assembly_list):
+    for a in assembly_list:
+        if a['waspnumber'] == assembly_id:
+            return f"{a['waspnumber']} - {a['description']}"
+
+assembly_list = get_assy_wasp_and_desc()
 DEFAULT_PRESETS = [
     {
         "name": "RGI35 Including Inspection, Kitted, Cost",\
         "unit_type": 'i2AX(BLK2) 616-12',
-        "assembly_id": "X61612 - 616-12 i2AX(BLK2) BOM by item",
+        "assembly_id": get_specific_assembly_and_desc('X61612', assembly_list),
         "contract": "RGI35",
         "include_inspection": True,
         "include_on_order": False,
@@ -19,7 +26,7 @@ DEFAULT_PRESETS = [
     {
         "name": "RGI35 Major Parts Including Inspection, Kitted, Cost",
         "unit_type": 'i2AX(BLK2) 616-12',
-        "assembly_id": "A61612 - i2AX(BLK2) Gimbal Major Parts Including Housing",
+        "assembly_id": get_specific_assembly_and_desc('A61612', assembly_list),
         "contract": "RGI35", 
         "include_inspection": True,
         "include_on_order": False,
@@ -31,7 +38,7 @@ DEFAULT_PRESETS = [
     {
         "name": "QIN11 Major Parts Including Inspection, Kitted, Cost",
         "unit_type": 'i2DAS 910-02',
-        "assembly_id": "A91002 - Major items for i2DAS QIN05 QIN11",
+        "assembly_id": get_specific_assembly_and_desc('A91002', assembly_list),
         "contract": "QIN11", 
         "include_inspection": True,
         "include_on_order": False,
@@ -43,7 +50,7 @@ DEFAULT_PRESETS = [
     {
         "name": "QIN11 Housing Including Inspection, Kitted, Cost",
         "unit_type": 'i2DAS 910-02',
-        "assembly_id": "C91002 - Housing Items for i2DAS QIN05 QIN11",
+        "assembly_id": get_specific_assembly_and_desc('C91002', assembly_list),
         "contract": "QIN11", 
         "include_inspection": True,
         "include_on_order": False,
@@ -55,7 +62,7 @@ DEFAULT_PRESETS = [
     {
         "name": "QIN11 Including Inspection, Kitted, Cost",
         "unit_type": 'i2DAS 910-02',
-        "assembly_id": "X91002 - 910-02 i2DAS BOM by item",
+        "assembly_id": get_specific_assembly_and_desc('X91002', assembly_list),
         "contract": "QIN11", 
         "include_inspection": True,
         "include_on_order": False,
@@ -183,7 +190,16 @@ def create_default_presets(conn=None):
                     %s, %s, %s,
                     %s, %s
                 )
-                ON CONFLICT (name) DO NOTHING;
+                ON CONFLICT (name) DO UPDATE SET 
+                    unit_type = EXCLUDED.unit_type,
+                    assembly_id = EXCLUDED.assembly_id,
+                    contract = EXCLUDED.contract,
+                    include_inspection = EXCLUDED.include_inspection,
+                    include_on_order = EXCLUDED.include_on_order,
+                    include_kitted = EXCLUDED.include_kitted,
+                    include_assembled = EXCLUDED.include_assembled,
+                    include_cost = EXCLUDED.include_cost,
+                    desired_amount = EXCLUDED.desired_amount;
             """, (
                 p['name'],
                 p['unit_type'],
