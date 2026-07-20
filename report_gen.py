@@ -22,7 +22,11 @@ def build_report_query(
 
     # getting the total amount of each inventory item in each top level BOM
     # this accounts for multi-level BOMs
-    assembly_inclusion = "WHERE root_item.sitename = ANY(%s) " # TODO: this should always include the assemblies in the stock assigned to the contract, but it seems that it's not working
+    assembly_inclusion = """WHERE EXISTS (
+            SELECT 1 FROM items si
+            WHERE si.waspnumber = root_item.waspnumber
+              AND si.sitename = ANY(%s)
+        ) """
     if include_kitted:
         assembly_inclusion = assembly_inclusion + "OR root_item.locationcode LIKE ANY(%s) "
     if include_assembled:
@@ -127,7 +131,7 @@ def build_report_query(
             'assy_category': ['910-02 i2DAS (QIN05, QIN11)']
         },
         'General Stock': {
-            'stock': 'SiteA',
+            'stock': ['SiteA'],
             'kit_patterns': ['%SiteA%'],
             'assy_category': ['910-02 i2DAS (QIN05, QIN11)', '616-12 RGI35 i2AX(BLK2)', '610-10 xxx i2ULS(BLK3)']
         },
@@ -145,6 +149,20 @@ def build_report_query(
     kit_patterns = contract_map[contract]['kit_patterns']
     assy_category = contract_map[contract]['assy_category']
 
+    assembled_exclusions = []
+    assembled_exclusion_params = []
+
+    if not include_kitted:
+        assembled_exclusions.append("ai.locationcode NOT LIKE ALL(%s)")
+        assembled_exclusion_params.append(kit_patterns)
+
+    if not include_inspection:
+        assembled_exclusions.append("NOT (ai.sitename = 'Lab' AND ai.locationcode = 'Inspection')")
+
+    assembled_kit_exclusion = ""
+    if assembled_exclusions:
+        assembled_kit_exclusion = "WHERE " + " AND ".join(assembled_exclusions) + " "
+
     params.append(stock_site) # root_item.sitename
     if include_kitted:
         params.append(kit_patterns) # root_item.location
@@ -154,6 +172,7 @@ def build_report_query(
         params.append(desired_amount)
     params.append(stock_site)
     params.append(kit_patterns)
+    params.extend(assembled_exclusion_params)
     params.append(assembly_id)
 
     # ----------------------------
@@ -161,9 +180,10 @@ def build_report_query(
     # ----------------------------
 
 
-    # this multiplies the amount of each assembly already assembled by the amount of the item in its BOM
+    # this multiplies the amount of each assembly al ready assembled by the amount of the item in its BOM
     # in order to get the amount of each item that has already been put into a built assembly
-    assembled_join = """
+
+    assembled_join = f"""
         LEFT JOIN (
             SELECT
                 fb.component_item_id,
@@ -175,7 +195,8 @@ def build_report_query(
 
             JOIN (
                 SELECT waspnumber, SUM(totalavailable) AS totalavailable
-                FROM items
+                FROM items ai
+                {assembled_kit_exclusion}
                 GROUP BY waspnumber
             ) parent_inv
                 ON parent_inv.waspnumber = root_item.waspnumber
