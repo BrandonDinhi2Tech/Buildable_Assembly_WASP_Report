@@ -22,31 +22,38 @@ def build_report_query(
 
     # getting the total amount of each inventory item in each top level BOM
     # this accounts for multi-level BOMs
-    cte = ""
+    assembly_inclusion = """WHERE EXISTS (
+            SELECT 1 FROM items si
+            WHERE si.waspnumber = root_item.waspnumber
+              AND si.sitename = ANY(%s)
+        ) """
+    if include_kitted:
+        assembly_inclusion = assembly_inclusion + "OR root_item.locationcode LIKE ANY(%s) "
     if include_assembled:
-        cte = """
-                WITH RECURSIVE flattened_bom AS (
-                    SELECT 
-                        b.parent_item_id AS root_item_id,
-                        b.component_item_id,
-                        b.quantity::numeric AS total_quantity
-                    FROM bom b
+        assembly_inclusion = assembly_inclusion + "OR root_item.category = ANY(%s) "
+    cte = f"""
+            WITH RECURSIVE flattened_bom AS (
+                SELECT 
+                    b.parent_item_id AS root_item_id,
+                    b.component_item_id,
+                    b.quantity::numeric AS total_quantity
+                FROM bom b
 
-                    JOIN items root_item
-                    ON root_item.id = b.parent_item_id
-                    WHERE root_item.category = ANY(%s) OR root_item.sitename = ANY(%s) OR root_item.locationcode LIKE ANY(%s)
+                JOIN items root_item
+                ON root_item.id = b.parent_item_id
+                {assembly_inclusion}
 
-                    UNION ALL
+                UNION ALL
 
-                    SELECT
-                        fb.root_item_id,
-                        b.component_item_id,
-                        fb.total_quantity * b.quantity
-                    FROM flattened_bom fb
-                    JOIN bom b
-                        ON fb.component_item_id = b.parent_item_id
-                ) 
-        """
+                SELECT
+                    fb.root_item_id,
+                    b.component_item_id,
+                    fb.total_quantity * b.quantity
+                FROM flattened_bom fb
+                JOIN bom b
+                    ON fb.component_item_id = b.parent_item_id
+            ) 
+    """
 
     # ----------------------------
     # 1. SELECT base columns
@@ -74,8 +81,7 @@ def build_report_query(
     if include_kitted:
         select_parts.append('COALESCE(kit.totalavailable, 0) AS "Quantity Kitted for Contract"')
 
-    if include_assembled:
-        select_parts.append('COALESCE(assembled.totalavailable, 0) AS "Quantity in Assembled Assemblies"')
+    select_parts.append('COALESCE(assembled.totalavailable, 0) AS "Quantity in Assembled Assemblies"')
     
     
 
@@ -93,8 +99,7 @@ def build_report_query(
     if include_kitted:
         available_terms.append('COALESCE(kit.totalavailable, 0)')
 
-    if include_assembled:
-        available_terms.append('COALESCE(assembled.totalavailable, 0)')
+    available_terms.append('COALESCE(assembled.totalavailable, 0)')
 
     available_expr = " + ".join(available_terms)
 
@@ -144,14 +149,30 @@ def build_report_query(
     kit_patterns = contract_map[contract]['kit_patterns']
     assy_category = contract_map[contract]['assy_category']
 
+    assembled_exclusions = []
+    assembled_exclusion_params = []
+
+    if not include_kitted:
+        assembled_exclusions.append("ai.locationcode NOT LIKE ALL(%s)")
+        assembled_exclusion_params.append(kit_patterns)
+
+    if not include_inspection:
+        assembled_exclusions.append("NOT (ai.sitename = 'Lab' AND ai.locationcode = 'Inspection')")
+
+    assembled_kit_exclusion = ""
+    if assembled_exclusions:
+        assembled_kit_exclusion = "WHERE " + " AND ".join(assembled_exclusions) + " "
+
+    params.append(stock_site) # root_item.sitename
+    if include_kitted:
+        params.append(kit_patterns) # root_item.location
     if include_assembled:
         params.append(assy_category) # root_item.category
-        params.append(stock_site) # root_item.sitename
-        params.append(kit_patterns) # root_item.location
     if desired_amount:
         params.append(desired_amount)
     params.append(stock_site)
     params.append(kit_patterns)
+    params.extend(assembled_exclusion_params)
     params.append(assembly_id)
 
     # ----------------------------
@@ -159,31 +180,31 @@ def build_report_query(
     # ----------------------------
 
 
-    # this multiplies the amount of each assembly already assembled by the amount of the item in its BOM
+    # this multiplies the amount of each assembly al ready assembled by the amount of the item in its BOM
     # in order to get the amount of each item that has already been put into a built assembly
-    assembled_join = ""
-    if include_assembled:
-        assembled_join = """
-            LEFT JOIN (
-                SELECT
-                    fb.component_item_id,
-                    SUM(parent_inv.totalavailable * fb.total_quantity) AS totalavailable
-                FROM flattened_bom fb
 
-                JOIN items root_item
-                ON root_item.id = fb.root_item_id
+    assembled_join = f"""
+        LEFT JOIN (
+            SELECT
+                fb.component_item_id,
+                SUM(parent_inv.totalavailable * fb.total_quantity) AS totalavailable
+            FROM flattened_bom fb
 
-                JOIN (
-                    SELECT waspnumber, SUM(totalavailable) AS totalavailable
-                    FROM items
-                    GROUP BY waspnumber
-                ) parent_inv
-                    ON parent_inv.waspnumber = root_item.waspnumber
+            JOIN items root_item
+            ON root_item.id = fb.root_item_id
 
-                GROUP BY fb.component_item_id
-            ) assembled
-                ON assembled.component_item_id = comp_master.id
-        """
+            JOIN (
+                SELECT waspnumber, SUM(totalavailable) AS totalavailable
+                FROM items ai
+                {assembled_kit_exclusion}
+                GROUP BY waspnumber
+            ) parent_inv
+                ON parent_inv.waspnumber = root_item.waspnumber
+
+            GROUP BY fb.component_item_id
+        ) assembled
+            ON assembled.component_item_id = comp_master.id
+    """
 
     group_by_parts = [
         'parent.waspnumber',
@@ -195,8 +216,7 @@ def build_report_query(
         'inv.totalavailable'
     ]
 
-    if include_assembled:
-        group_by_parts.append('assembled.totalavailable')
+    group_by_parts.append('assembled.totalavailable')
     if include_on_order:
         group_by_parts.append('comp_master.onorder')
     if include_inspection:
