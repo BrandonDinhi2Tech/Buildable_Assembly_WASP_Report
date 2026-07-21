@@ -149,10 +149,12 @@ def build_report_query(
     kit_patterns = contract_map[contract]['kit_patterns']
     assy_category = contract_map[contract]['assy_category']
 
+
+    # assembled_exclusions handles the exclusion of kitted/under inspection assemblies when the user doesn't choose to include those categories
     assembled_exclusions = []
     assembled_exclusion_params = []
 
-    if not include_kitted:
+    if not include_kitted and not include_assembled: # intended behavior is to include assemblies even if they are in kit locations if assembled quantity is ticked but kitted quantity isn't
         assembled_exclusions.append("ai.locationcode NOT LIKE ALL(%s)")
         assembled_exclusion_params.append(kit_patterns)
 
@@ -182,7 +184,6 @@ def build_report_query(
 
     # this multiplies the amount of each assembly al ready assembled by the amount of the item in its BOM
     # in order to get the amount of each item that has already been put into a built assembly
-
     assembled_join = f"""
         LEFT JOIN (
             SELECT
