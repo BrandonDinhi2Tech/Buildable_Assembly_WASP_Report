@@ -68,7 +68,7 @@ def build_history_to_database(df):
     build_filtered['TransactionCost'] = pd.to_numeric(build_filtered['TransactionCost'], errors='coerce')
     # parsing to a real Timestamp (rather than leaving the raw string) sidesteps
     # the source's 7-digit fractional seconds, which Postgres's timestamp parser
-    # won't accept; to_csv() below serializes this as ISO 8601 and NaT as blank
+    # won't accept; to_csv() below serializes this as hh:mm:ss and NaT as blank
     build_filtered['TransactionDate'] = pd.to_datetime(build_filtered['TransactionDate'], errors='coerce')
 
     try:
