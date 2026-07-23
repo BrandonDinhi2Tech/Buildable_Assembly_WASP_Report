@@ -2,6 +2,7 @@ import item
 import assembly
 import location
 import report_gen
+import buildhistory
 import settings
 import presets
 import tkinter as tk
@@ -237,6 +238,7 @@ class BuildableAssemblyWaspReportGenerator:
                 location.update_location_table()
                 item.inventory_to_database(item.entire_inventory_api_call())
                 assembly.update_bom_table()
+                buildhistory.update_build_history_table()
 
                 display_values = []
                 if refresh_combobox:
@@ -451,4 +453,5 @@ if __name__ == "__main__":
     # item.entire_inventory_api_call('item_list.csv')
     # item.inventory_to_database('item_list.csv')
     # assembly.update_bom_table()
+    # buildhistory.update_build_history_table()
     # report_gen.create_report('800002', 'RGI35', include_cost=True, include_inspection=True, include_on_order=True, desired_amount=50)
