@@ -429,25 +429,25 @@ class BuildableAssemblyWaspReportGenerator:
             self.refresh_preset_list()
 
 if __name__ == "__main__":
-    root=ttkbootstrap.Window(themename="flatly")
+    # root=ttkbootstrap.Window(themename="flatly")
 
-    presets.create_default_presets() # makes the default presets that every user will have on startup
+    # presets.create_default_presets() # makes the default presets that every user will have on startup
 
-    # setting font sizes across the UI
-    style = ttkbootstrap.Style()
-    style.configure('TButton', font=('Segoe UI', 12))
-    style.configure('TLabel', font=('Segoe UI', 12))
-    style.configure('TCheckbutton', font=('Segoe UI', 12))
-    style.configure('TLabelframe.Label', font=('Segoe UI', 10))
+    # # setting font sizes across the UI
+    # style = ttkbootstrap.Style()
+    # style.configure('TButton', font=('Segoe UI', 12))
+    # style.configure('TLabel', font=('Segoe UI', 12))
+    # style.configure('TCheckbutton', font=('Segoe UI', 12))
+    # style.configure('TLabelframe.Label', font=('Segoe UI', 10))
 
-    app = BuildableAssemblyWaspReportGenerator(root)
+    # app = BuildableAssemblyWaspReportGenerator(root)
 
-    # bring app to the front, then allow it to go to the background if the user wishes
-    root.lift()
-    root.attributes('-topmost', True)
-    root.after_idle(root.attributes, '-topmost', False)
+    # # bring app to the front, then allow it to go to the background if the user wishes
+    # root.lift()
+    # root.attributes('-topmost', True)
+    # root.after_idle(root.attributes, '-topmost', False)
 
-    root.mainloop()
+    # root.mainloop()
 
     # ----------------------------- unit test -------------------------------------
     # location.update_location_table()
@@ -455,6 +455,6 @@ if __name__ == "__main__":
     # item.inventory_to_database('item_list.csv')
     # assembly.update_bom_table()
     # buildhistory.update_build_history_table()
-    # df = buildhistory.get_build_item_history('Build 616-00089')
-    # df.to_csv('616-00089 Build History.csv', index=False)
+    df = buildhistory.get_build_item_history('Build 616-00089')
+    df.to_csv('616-00089 Build History.csv', index=False)
     # report_gen.create_report('800002', 'RGI35', include_cost=True, include_inspection=True, include_on_order=True, desired_amount=50)

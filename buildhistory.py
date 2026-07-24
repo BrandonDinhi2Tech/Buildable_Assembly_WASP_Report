@@ -30,7 +30,7 @@ def transaction_history_api_call():
     response = requests.post(url, headers=headers, data=payload)
     response.raise_for_status()
     csv_data = response.text
-    return pd.read_csv(StringIO(csv_data))
+    return pd.read_csv(StringIO(csv_data), dtype=str)
 
 
 # Loads transaction history into the build_history table.
@@ -213,10 +213,14 @@ _BUILD_TREE_CTE = """
            AND comp.transactiontype = 'Remove'
         JOIN build_history child_add
             ON child_add.transactiontype = 'Add'
-           AND child_add.waspnumber = comp.waspnumber
-           AND child_add.serialnumber = comp.serialnumber
-           AND child_add.serialnumber IS NOT NULL
-           AND NOT (child_add.ordernumber = ANY(bt.path))  -- guard against cycles
+            AND child_add.waspnumber = comp.waspnumber
+            AND child_add.serialnumber = comp.serialnumber
+            AND child_add.serialnumber IS NOT NULL
+            AND NOT (child_add.ordernumber = ANY(bt.path))  -- guard against cycles
+            -- a blank OrderNumber means this "Add" was an ordinary receiving/
+            -- check-in event, not a build -- don't treat it as a sub-assembly
+            AND child_add.ordernumber IS NOT NULL
+            AND child_add.ordernumber <> ''
     )
 """
 
@@ -292,11 +296,17 @@ def get_build_item_history(order_number=None, waspnumber=None, conn=None):
         WHERE NOT EXISTS (
             -- exclude components that are themselves an expandable sub-assembly;
             -- their own components already show up one level deeper in the tree
+            -- The blank-OrderNumber check matters: without it, an item that was
+            -- simply received/checked in (Add with no OrderNumber) under the same
+            -- WASPNumber+SerialNumber as a build component gets mistaken for a
+            -- sub-assembly and wrongly dropped from the leaf-level results.
             SELECT 1 FROM build_history child_add
             WHERE child_add.transactiontype = 'Add'
               AND child_add.waspnumber = comp.waspnumber
               AND child_add.serialnumber = comp.serialnumber
               AND child_add.serialnumber IS NOT NULL
+              AND child_add.ordernumber IS NOT NULL
+              AND child_add.ordernumber <> ''
         )
         ORDER BY bt.root_build_date DESC, comp.transactiondate;
     """
