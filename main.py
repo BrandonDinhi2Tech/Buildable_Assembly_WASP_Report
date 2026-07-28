@@ -454,7 +454,7 @@ if __name__ == "__main__":
     # item.entire_inventory_api_call('item_list.csv')
     # item.inventory_to_database('item_list.csv')
     # assembly.update_bom_table()
-    # buildhistory.update_build_history_table()
+    buildhistory.update_build_history_table()
     df = buildhistory.get_build_item_history('Build 616-00089')
     df.to_csv('616-00089 Build History.csv', index=False)
     # report_gen.create_report('800002', 'RGI35', include_cost=True, include_inspection=True, include_on_order=True, desired_amount=50)
