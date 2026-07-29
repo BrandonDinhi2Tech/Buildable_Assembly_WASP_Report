@@ -125,7 +125,7 @@ class BuildableAssemblyWaspReportGenerator:
         output_frame.columnconfigure(1, weight=1)
 
         ttk.Label(output_frame, text="Output Directory:").grid(row=0, column=0, sticky="e")
-        self.output_folder = tk.StringVar()
+        self.output_folder = tk.StringVar(value=os.getcwd())
         self.output_folder_entry = ttk.Entry(output_frame, textvariable=self.output_folder)
         self.output_folder_entry.grid(row=0, column=1, sticky="ew")
 
