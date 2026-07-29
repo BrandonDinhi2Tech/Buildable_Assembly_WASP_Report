@@ -7,6 +7,8 @@ import presets
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import os
+import socket
+from pathlib import Path
 import sys
 import subprocess
 import ttkbootstrap
@@ -16,6 +18,10 @@ import datetime
 class BuildableAssemblyWaspReportGenerator:
     list_of_contracts = ['RGI35', 'QIN05', 'QIN11', 'General Stock', 'All']
     list_of_units = ['i2AX(BLK2) 616-12', 'i2DAS 910-02']
+
+    home_dir = Path.home()
+    target_folder = home_dir / "Documents" / "WASP Assembly Reports"
+    target_folder.mkdir(parents=True, exist_ok=True)
 
     def __init__(self, root):
         self.root = root
@@ -86,7 +92,7 @@ class BuildableAssemblyWaspReportGenerator:
             self.assembly_combobox.current(0)
         self.assembly_combobox.grid(row=0, column=1, sticky="ew")
 
-        ttk.Label(selection_frame, text="Contract/GO#:").grid(row=1, column=0, sticky="e")
+        ttk.Label(selection_frame, text="Stock Area:").grid(row=1, column=0, sticky="e")
         self.contract_combobox = ttk.Combobox(selection_frame, width=50, state="readonly")
         self.contract_combobox['values'] = self.list_of_contracts
         if self.list_of_contracts:
@@ -127,7 +133,7 @@ class BuildableAssemblyWaspReportGenerator:
         output_frame.columnconfigure(1, weight=1)
 
         ttk.Label(output_frame, text="Output Directory:").grid(row=0, column=0, sticky="e")
-        self.output_folder = tk.StringVar(value=os.getcwd())
+        self.output_folder = tk.StringVar(value=self.target_folder)
         self.output_folder_entry = ttk.Entry(output_frame, textvariable=self.output_folder)
         self.output_folder_entry.grid(row=0, column=1, sticky="ew")
 
@@ -221,17 +227,47 @@ class BuildableAssemblyWaspReportGenerator:
         except Exception as e:
             messagebox.showerror("Failed to update assembly list", str(e))
 
+    def _can_connect_to_server(self, host='i2techinventory', port=8703, timeout=5):
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except OSError:
+            return False
+
     # refreshes database and optionally the assembly combobox as well
     def refresh_database(self, refresh_combobox):
+
+        # _refresh_in_progress is False if it doesn't exist
+        if getattr(self, '_refresh_in_progress', False):
+            return
+
+        self._refresh_in_progress = True
+        self._refresh_id = getattr(self, '_refresh_id', 0) + 1
+        refresh_id = self._refresh_id
+
+        # disable refresh database button when refresh is in progress
+        if hasattr(self, 'refresh_database_button'):
+            self.refresh_database_button.config(state='disabled')
+
         # progress bar popup window
         popup = tk.Toplevel(self.root)
         popup.title("Database Refresh")
-        popup.geometry("300x150")
+        popup.geometry("400x150")
+        popup.transient(self.root)
+        popup.grab_set()
+        popup.resizable(False, False)
         label = ttk.Label(popup, text="Refreshing database, please wait...", font=("Segoe UI", 12))
         label.pack(pady=10)
         pb = ttk.Progressbar(popup, orient='horizontal', mode='indeterminate', length=280)
         pb.pack(pady=10)
         pb.start()
+
+        def finish_refresh():
+            if refresh_id != self._refresh_id:
+                return
+            self._refresh_in_progress = False
+            if hasattr(self, 'refresh_database_button'):
+                self.refresh_database_button.config(state='normal')
 
         # database refresh is done on separate thread from all of the GUI updates to avoid freezing the GUI
         def do_work():
@@ -259,7 +295,10 @@ class BuildableAssemblyWaspReportGenerator:
 
         # this updates the GUI after the database refresh is done successfully
         def on_success(display_values):
+            if refresh_id != self._refresh_id:
+                return
             pb.stop()
+            popup.grab_release()
             pb.destroy()
             if refresh_combobox:
                 self.assembly_combobox['values'] = display_values
@@ -270,13 +309,51 @@ class BuildableAssemblyWaspReportGenerator:
             # update timestamp for last database refresh
             settings.save_refresh_timestamp()
             self.last_refresh_label.config(text=f"Last refresh: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            finish_refresh()
 
         # this pops up an error message if the database refresh fails
         def on_error(e):
+            if refresh_id != self._refresh_id:
+                return
+            error_message = str(e) if e else "Unknown error"
             pb.stop()
+            popup.grab_release()
             pb.destroy()
-            label.config(text=f"Failed to refresh database.")
-            ttk.Button(popup, text="OK", command=popup.destroy, ).pack(pady=5)
+            label.config(text="Failed to refresh database.")
+            ttk.Button(popup, text="OK", command=popup.destroy).pack(pady=5)
+            messagebox.showerror("Database refresh failed", error_message)
+            finish_refresh()
+
+        def on_timeout():
+            if refresh_id != self._refresh_id:
+                return
+            self._refresh_id += 1
+            pb.stop()
+            popup.grab_release()
+            pb.destroy()
+            label.config(text="Database refresh timed out.")
+            ttk.Button(popup, text="OK", command=popup.destroy).pack(pady=5)
+            messagebox.showerror("Database refresh timed out", "The refresh took too long and was aborted. Please retry when the network is stable.")
+            self._refresh_in_progress = False
+            if hasattr(self, 'refresh_database_button'):
+                self.refresh_database_button.config(state='normal')
+
+        try:
+            can_connect = self._can_connect_to_server()
+        except Exception as e:
+            print("Server connectivity check failed:", e)
+            can_connect = False
+
+        if not can_connect:
+            pb.stop()
+            popup.grab_release()
+            pb.destroy()
+            label.config(text="Cannot reach WASP server.\nCheck if connected to i2Tech Inventory WiFi and retry.", justify='center', anchor='center')
+            ttk.Button(popup, text="OK", command=popup.destroy).pack(pady=5)
+            finish_refresh()
+            return
+
+        self.root.after(20000, on_timeout) # max time allowed for database refresh in milliseconds
 
         # starts the multi-threaded database refresh
         threading.Thread(target=do_work, daemon=True).start()
@@ -332,7 +409,7 @@ class BuildableAssemblyWaspReportGenerator:
         # falling back to current directory if output directory isn't chosen by user
         output_dir = self.output_folder.get()
         if not output_dir:
-            output_dir = os.getcwd()
+            output_dir = self.target_folder
 
         # make sure desired_amount is cast to int
         desired_amount = self.desired_amount_entry.get().strip()

@@ -14,9 +14,8 @@ def assembly_api_call(assembly_number):
     'Content-Type': 'application/json'
     }
 
-    response = requests.request("POST", url, headers=headers, data=payload)
-    # assembly_details = response.text
-    # print(assembly_details)
+    response = requests.request("POST", url, headers=headers, data=payload, timeout=15)
+    response.raise_for_status()
     return response.json()
 
 # gets a list of all unique assembly numbers
@@ -144,3 +143,4 @@ def update_bom_table():
 
     except Exception as e:
         print('Failed bom update', e)
+        raise

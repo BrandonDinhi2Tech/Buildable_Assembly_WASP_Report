@@ -432,6 +432,12 @@ def create_report(
                 bom_cost_cell.font = Font(name="Calibri", size=20, bold=True)
 
             summary_start_row = 7 if include_cost else 6
+
+            if desired_amount:
+                desired_amount_cell = ws_title.cell(row=summary_start_row, column=1, value = f"Desired Amount: {desired_amount}")
+                desired_amount_cell.font = Font(name="Calibri", size=20, bold = True)
+
+
             if "Available-Desired Quantity" in df.columns:
                 shortfall_col = df.pop("Available-Desired Quantity")
                 insert_at = df.columns.get_loc("Quantity in BOM") + 1
@@ -440,7 +446,14 @@ def create_report(
             short_red_color = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid") # use this color for indicating parts we're short on
 
             if desired_amount is not None and "Available-Desired Quantity" in df.columns:
-                shortfall_rows = df.loc[df["Available-Desired Quantity"] < 0, ["Component", "Component Description", "Available-Desired Quantity"]]
+                if not include_cost:
+                    shortfall_rows = df.loc[df["Available-Desired Quantity"] < 0, ["Component", "Component Description", "Available-Desired Quantity"]]
+                else:
+                    shortfall_rows = df.loc[df["Available-Desired Quantity"] < 0, ["Component", "Component Description", "Available-Desired Quantity", "Component Cost"]]
+
+                if desired_amount:
+                    summary_start_row += 1
+
                 if not shortfall_rows.empty:
                     shortfall_title_cell = ws_title.cell(row=summary_start_row, column=1, value="Items required to build desired amount:")
                     shortfall_title_cell.font = Font(name="Calibri", size=16, bold=True)
@@ -453,6 +466,11 @@ def create_report(
 
                     shortfall_amount_header = ws_title.cell(row=summary_start_row + 1, column=3, value="Shortfall")
                     shortfall_amount_header.font = Font(name="Calibri", size=14, bold=True)
+
+                    if include_cost:
+                        shortfall_cost_header = ws_title.cell(row=summary_start_row + 1, column=4, value="Component Cost")
+                        shortfall_cost_header.font = Font(name="Calibri", size=14, bold=True)
+
 
                     for offset, (_, row) in enumerate(shortfall_rows.iterrows(), start=2):
                         shortfall_component_cell = ws_title.cell(
@@ -479,7 +497,30 @@ def create_report(
                         shortfall_amount_cell.font = Font(name="Calibri", size=14)
                         shortfall_amount_cell.fill = short_red_color
 
-            date_cell = ws_title.cell(row=1, column=2, value=f"Date: {datetime.now()}")
+                        if include_cost:
+                            shortfall_cost_cell = ws_title.cell(
+                                row=summary_start_row+offset,
+                                column=4,
+                                value=row["Component Cost"]
+                            )
+                            shortfall_cost_cell.font=Font(name="Calibri", size=14)
+                            shortfall_cost_cell.fill = short_red_color
+                            shortfall_cost_cell.number_format = '"$"#,##0.00' # formatting shortfall cost into dollars
+
+                    # display total cost of shortfall parts
+                    if include_cost:
+                        total_cost = (
+                            shortfall_rows["Available-Desired Quantity"].abs() *
+                            shortfall_rows["Component Cost"]
+                        ).sum()
+                        total_row = summary_start_row + len(shortfall_rows) + 2
+                        total_label_cell = ws_title.cell(row=total_row, column=3, value="Total Shortfall Cost:")
+                        total_label_cell.font = Font(name="Calibri", size=14, bold=True)
+                        total_value_cell = ws_title.cell(row=total_row, column=4, value=total_cost)
+                        total_value_cell.font = Font(name="Calibri", size=14, bold=True)
+                        total_value_cell.number_format = '"$"#,##0.00'
+
+            date_cell = ws_title.cell(row=1, column=2, value=f"Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
             date_cell.font = Font(name="Calibri", size=14)
             df.to_excel(writer, index=False, sheet_name="Report")
 

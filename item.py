@@ -28,7 +28,8 @@ def entire_inventory_api_call():
     'Content-Type': 'application/json'
     }
 
-    response = requests.request("POST", url, headers=headers, data=payload)
+    response = requests.request("POST", url, headers=headers, data=payload, timeout=30)
+    response.raise_for_status()
     csv_data = response.text
     return pd.read_csv(StringIO(csv_data))
 
@@ -114,6 +115,7 @@ def inventory_to_database(df):
         print("Items Imported")
     except Exception as e:
         print('Failed data import', e)
+        raise
     finally:
         cursor.close()
         conn.close()
