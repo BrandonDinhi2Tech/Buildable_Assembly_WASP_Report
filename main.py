@@ -7,6 +7,8 @@ import presets
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import os
+import sys
+import subprocess
 import ttkbootstrap
 import threading
 import datetime
@@ -341,9 +343,10 @@ class BuildableAssemblyWaspReportGenerator:
 
         preset_name = self.get_active_preset_name() # get preset name if the preset is actually selected
 
+        file_path = '' # full file path for the output used to open up the report automatically on generation
         try:
             if desired_amount is None:
-                report_gen.create_report(assembly_num=waspnumber, 
+                file_path = report_gen.create_report(assembly_num=waspnumber, 
                                         contract=self.contract_combobox.get(), 
                                         include_inspection=self.include_inspection.get(), 
                                         include_cost=self.include_cost.get(),
@@ -355,7 +358,7 @@ class BuildableAssemblyWaspReportGenerator:
                                         preset_name = preset_name
                                         )
             else:
-                report_gen.create_report(assembly_num=waspnumber, 
+                file_path = report_gen.create_report(assembly_num=waspnumber, 
                                         contract=self.contract_combobox.get(), 
                                         include_inspection=self.include_inspection.get(), 
                                         include_cost=self.include_cost.get(), 
@@ -367,6 +370,18 @@ class BuildableAssemblyWaspReportGenerator:
                                         include_assembled=self.include_assembled.get(),
                                         preset_name = preset_name
                                         )
+
+            # open up report in default spreadsheet viewer
+            if os.path.exists(file_path):
+                if sys.platform == "win32": # Windows
+                    os.startfile(file_path)
+                elif sys.platform == "darwin":  # macOS
+                    subprocess.Popen(["open", file_path])
+                else:  # Linux
+                    subprocess.Popen(["xdg-open", file_path])
+            else:
+                messagebox.showerror("Error: file not found")
+
             messagebox.showinfo(title='Generate Report', message=f"Generated report successfully at {output_dir}")
         except Exception as e:
             messagebox.showerror('Failed to generate report', str(e))

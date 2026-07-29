@@ -315,7 +315,7 @@ def build_output_filename(
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
 
     flags = " ".join(parts)
-    filename = f" {timestamp} " + flags + ".xlsx"
+    filename = f"{timestamp} " + flags + ".xlsx"
 
     return flags, filename
 
@@ -375,7 +375,7 @@ def create_report(
         # if a preset is actually selected, then use it as the file name
         if preset_name:
             timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-            file_name = f" {timestamp} " + preset_name + ".xlsx"
+            file_name = f"{timestamp} " + preset_name + ".xlsx"
         
         # accounting for the user's chosen output directory
         if output_directory:
@@ -413,16 +413,20 @@ def create_report(
             ws_title = writer.book.create_sheet(title="Title Page")
             title_cell = ws_title.cell(row=1, column=1, value=f"WASP Buildable Report {report_title_flags}")
             title_cell.font = Font(name="Calibri", size = 14, bold = True)
+
             assembly_num_cell = ws_title.cell(row=2, column=1, value=f"BOM: {assembly_num}")
             assembly_num_cell.font = Font(name="Calibri", size=14)
+
             assembly_desc_cell = ws_title.cell(row=3, column=1, value=f"Desc: {assembly_description}")
             assembly_desc_cell.font = Font(name="Calibri", size=14)
+
             buildable_units_cell = ws_title.cell(row=4, column=1, value=f"Buildable Units: {assembly_buildable}")
             buildable_units_cell.font = Font(name="Calibri", size=72, bold=True)
 
             if include_cost:
                 cost_label_cell = ws_title.cell(row=5, column=1, value=f"Cost per unit of BOM: ")
                 cost_label_cell.font = Font(name="Calibri", size=20, bold=True)
+
                 bom_cost_cell = ws_title.cell(row=5, column=2, value=assembly_cost)
                 bom_cost_cell.number_format = '"$"#,##0.00' # formatting bom cost into dollars
                 bom_cost_cell.font = Font(name="Calibri", size=20, bold=True)
@@ -433,19 +437,23 @@ def create_report(
                 insert_at = df.columns.get_loc("Quantity in BOM") + 1
                 df.insert(insert_at, "Available-Desired Quantity", shortfall_col)
 
-            short_red_color = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+            short_red_color = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid") # use this color for indicating parts we're short on
 
             if desired_amount is not None and "Available-Desired Quantity" in df.columns:
                 shortfall_rows = df.loc[df["Available-Desired Quantity"] < 0, ["Component", "Component Description", "Available-Desired Quantity"]]
                 if not shortfall_rows.empty:
-                    shortfall_title_cell = ws_title.cell(row=summary_start_row, column=1, value="Items below desired amount:")
+                    shortfall_title_cell = ws_title.cell(row=summary_start_row, column=1, value="Items required to build desired amount:")
                     shortfall_title_cell.font = Font(name="Calibri", size=16, bold=True)
+
                     shortfall_component_header = ws_title.cell(row=summary_start_row + 1, column=1, value="Component")
                     shortfall_component_header.font = Font(name="Calibri", size=14, bold=True)
+
                     shortfall_component_desc_header = ws_title.cell(row=summary_start_row + 1, column=2, value="Component Description")
                     shortfall_component_desc_header.font = Font(name="Calibri", size=14, bold=True)
+
                     shortfall_amount_header = ws_title.cell(row=summary_start_row + 1, column=3, value="Shortfall")
                     shortfall_amount_header.font = Font(name="Calibri", size=14, bold=True)
+
                     for offset, (_, row) in enumerate(shortfall_rows.iterrows(), start=2):
                         shortfall_component_cell = ws_title.cell(
                             row=summary_start_row + offset,
@@ -530,6 +538,8 @@ def create_report(
 
         cursor.close()
         conn.close()
+
+        return full_path # for opening up the report automatically after generation
 
     except Exception as e:
         print('Failed to create report', e)
