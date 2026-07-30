@@ -353,7 +353,7 @@ class BuildableAssemblyWaspReportGenerator:
             finish_refresh()
             return
 
-        self.root.after(30000, on_timeout) # max time allowed for database refresh in milliseconds
+        self.root.after(60000, on_timeout) # max time allowed for database refresh in milliseconds
 
         # starts the multi-threaded database refresh
         threading.Thread(target=do_work, daemon=True).start()
