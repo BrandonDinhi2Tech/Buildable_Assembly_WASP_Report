@@ -423,6 +423,7 @@ def create_report(
             buildable_units_cell = ws_title.cell(row=4, column=1, value=f"Buildable Units: {assembly_buildable}")
             buildable_units_cell.font = Font(name="Calibri", size=72, bold=True)
 
+            # include cost of BOM if needed
             if include_cost:
                 cost_label_cell = ws_title.cell(row=5, column=1, value=f"Cost per unit of BOM: ")
                 cost_label_cell.font = Font(name="Calibri", size=20, bold=True)
@@ -431,13 +432,14 @@ def create_report(
                 bom_cost_cell.number_format = '"$"#,##0.00' # formatting bom cost into dollars
                 bom_cost_cell.font = Font(name="Calibri", size=20, bold=True)
 
-            summary_start_row = 7 if include_cost else 6
+            summary_start_row = 7 if include_cost else 6 # start of summary of short parts if needed
 
+            # add desired amount to title page if necessary
             if desired_amount:
                 desired_amount_cell = ws_title.cell(row=summary_start_row, column=1, value = f"Desired Amount: {desired_amount}")
                 desired_amount_cell.font = Font(name="Calibri", size=20, bold = True)
 
-
+            # move available-desired quantity towards the left of the report so it's easier to see at a glance
             if "Available-Desired Quantity" in df.columns:
                 shortfall_col = df.pop("Available-Desired Quantity")
                 insert_at = df.columns.get_loc("Quantity in BOM") + 1
@@ -445,16 +447,19 @@ def create_report(
 
             short_red_color = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid") # use this color for indicating parts we're short on
 
+            # filling up shortfall_rows with rows that are short of desired quantity
             if desired_amount is not None and "Available-Desired Quantity" in df.columns:
                 if not include_cost:
                     shortfall_rows = df.loc[df["Available-Desired Quantity"] < 0, ["Component", "Component Description", "Available-Desired Quantity"]]
                 else:
                     shortfall_rows = df.loc[df["Available-Desired Quantity"] < 0, ["Component", "Component Description", "Available-Desired Quantity", "Component Cost"]]
 
+                # offsetting for the extra row that desired amount might have taken up
                 if desired_amount:
                     summary_start_row += 1
 
                 if not shortfall_rows.empty:
+                    # title and headers for shortfall summary
                     shortfall_title_cell = ws_title.cell(row=summary_start_row, column=1, value="Items required to build desired amount:")
                     shortfall_title_cell.font = Font(name="Calibri", size=16, bold=True)
 
@@ -471,7 +476,7 @@ def create_report(
                         shortfall_cost_header = ws_title.cell(row=summary_start_row + 1, column=4, value="Component Cost")
                         shortfall_cost_header.font = Font(name="Calibri", size=14, bold=True)
 
-
+                    # printing out rows that were short of desired amount
                     for offset, (_, row) in enumerate(shortfall_rows.iterrows(), start=2):
                         shortfall_component_cell = ws_title.cell(
                             row=summary_start_row + offset,
@@ -520,6 +525,7 @@ def create_report(
                         total_value_cell.font = Font(name="Calibri", size=14, bold=True)
                         total_value_cell.number_format = '"$"#,##0.00'
 
+            # add date of report creation to the top of the title page
             date_cell = ws_title.cell(row=1, column=2, value=f"Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
             date_cell.font = Font(name="Calibri", size=14)
             df.to_excel(writer, index=False, sheet_name="Report")
