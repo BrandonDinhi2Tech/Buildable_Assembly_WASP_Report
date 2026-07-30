@@ -75,8 +75,8 @@ def build_report_query(
     if include_inspection:
         select_parts.append('COALESCE(inspection.totalavailable, 0) AS "Quantity Pending Inspection"')
 
-    if include_on_order:
-        select_parts.append('COALESCE(comp_master.onorder, 0) AS "Quantity on Order"')
+    # if include_on_order:
+    select_parts.append('COALESCE(comp_master.onorder, 0) AS "Quantity on Order"')
 
     if include_kitted:
         select_parts.append('COALESCE(kit.totalavailable, 0) AS "Quantity Kitted for Contract"')
@@ -218,8 +218,8 @@ def build_report_query(
     ]
 
     group_by_parts.append('assembled.totalavailable')
-    if include_on_order:
-        group_by_parts.append('comp_master.onorder')
+    # if include_on_order:
+    group_by_parts.append('comp_master.onorder')
     if include_inspection:
         group_by_parts.append('inspection.totalavailable')
     if include_kitted:
@@ -448,11 +448,13 @@ def create_report(
             short_red_color = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid") # use this color for indicating parts we're short on
 
             # filling up shortfall_rows with rows that are short of desired quantity
+            shortfall_info = ["Component", "Component Description", "Available-Desired Quantity"] # columns of dataframe to pull info about shortfall from
+            if include_cost:
+                shortfall_info.append("Component Cost")
+            if not include_on_order:
+                shortfall_info.append("Quantity on Order")
             if desired_amount is not None and "Available-Desired Quantity" in df.columns:
-                if not include_cost:
-                    shortfall_rows = df.loc[df["Available-Desired Quantity"] < 0, ["Component", "Component Description", "Available-Desired Quantity"]]
-                else:
-                    shortfall_rows = df.loc[df["Available-Desired Quantity"] < 0, ["Component", "Component Description", "Available-Desired Quantity", "Component Cost"]]
+                shortfall_rows = df.loc[df["Available-Desired Quantity"] < 0, shortfall_info]
 
                 # offsetting for the extra row that desired amount might have taken up
                 if desired_amount:
@@ -475,6 +477,11 @@ def create_report(
                     if include_cost:
                         shortfall_cost_header = ws_title.cell(row=summary_start_row + 1, column=4, value="Component Cost")
                         shortfall_cost_header.font = Font(name="Calibri", size=14, bold=True)
+
+                    if not include_on_order:
+                        shortfall_on_order_header = ws_title.cell(row=summary_start_row + 1, column=5, value="Quantity on Order")
+                        shortfall_on_order_header.font = Font(name="Calibri", size=14, bold=True)
+
 
                     # printing out rows that were short of desired amount
                     for offset, (_, row) in enumerate(shortfall_rows.iterrows(), start=2):
@@ -511,6 +518,17 @@ def create_report(
                             shortfall_cost_cell.font=Font(name="Calibri", size=14)
                             shortfall_cost_cell.fill = short_red_color
                             shortfall_cost_cell.number_format = '"$"#,##0.00' # formatting shortfall cost into dollars
+
+                        if not include_on_order:
+                            shortfall_on_order_cell = ws_title.cell(
+                                row=summary_start_row+offset,
+                                column=5,
+                                value=row["Quantity on Order"]
+                            )
+                            shortfall_on_order_cell.font = Font(name="Calibri", size=14)
+                            # if on order quantity is less than what is needed to fulfill desired quantity, highlight in red
+                            if row["Quantity on Order"] < abs(row["Available-Desired Quantity"]):
+                                shortfall_on_order_cell.fill = short_red_color
 
                     # display total cost of shortfall parts
                     if include_cost:
