@@ -35,7 +35,7 @@ class BuildableAssemblyWaspReportGenerator:
         mainframe.columnconfigure(1, weight=1)
 
         # attempt to make all fonts size 12, see __main__ for more font size changes (ttkbootstrap requires a different way of setting the font)
-        combobox_font = tk.font.Font(family="Segoe UI",size=12)
+        combobox_font = tk.font.Font(family="Segoe UI",size=14)
         root.option_add("*Font", combobox_font)
  
 
@@ -107,13 +107,13 @@ class BuildableAssemblyWaspReportGenerator:
         ttk.Checkbutton(options_frame, text="Include Inspection Quantity", variable=self.include_inspection).grid(row=0, column=0, sticky="w")
 
         self.include_on_order = tk.BooleanVar()
-        ttk.Checkbutton(options_frame, text="Include On-Order Quantity", variable=self.include_on_order).grid(row=1, column=0, sticky="w")
+        ttk.Checkbutton(options_frame, text="Include On-Order Quantity", variable=self.include_on_order).grid(row=0, column=1, sticky="w", padx=10)
 
         self.include_kitted = tk.BooleanVar()
-        ttk.Checkbutton(options_frame, text="Include Kitted Quantity", variable=self.include_kitted).grid(row=2, column=0, sticky="w")
+        ttk.Checkbutton(options_frame, text="Include Kitted Quantity", variable=self.include_kitted).grid(row=1, column=0, sticky="w")
 
         self.include_assembled = tk.BooleanVar()
-        ttk.Checkbutton(options_frame, text="Include Assembled Quantity", variable=self.include_assembled).grid(row=3, column=0, sticky="w")
+        ttk.Checkbutton(options_frame, text="Include Assembled Quantity", variable=self.include_assembled).grid(row=1, column=1, sticky="w", padx=10)
 
         # ------------------ Settings Frame ------------------
         settings_frame = ttk.LabelFrame(mainframe, text="Settings", padding=10)
@@ -256,11 +256,22 @@ class BuildableAssemblyWaspReportGenerator:
         popup.transient(self.root)
         popup.grab_set()
         popup.resizable(False, False)
-        label = ttk.Label(popup, text="Refreshing database, please wait...", font=("Segoe UI", 12))
+        label = ttk.Label(popup, text="Refreshing database, please wait...", font=("Segoe UI", 14))
         label.pack(pady=10)
         pb = ttk.Progressbar(popup, orient='horizontal', mode='indeterminate', length=280)
         pb.pack(pady=10)
         pb.start()
+
+        after_id = None
+
+        def cancel_refresh_timeout():
+            nonlocal after_id
+            if after_id is not None:
+                try:
+                    self.root.after_cancel(after_id)
+                except Exception:
+                    pass
+                after_id = None
 
         def finish_refresh():
             if refresh_id != self._refresh_id:
@@ -297,6 +308,7 @@ class BuildableAssemblyWaspReportGenerator:
         def on_success(display_values):
             if refresh_id != self._refresh_id:
                 return
+            cancel_refresh_timeout()
             pb.stop()
             popup.grab_release()
             pb.destroy()
@@ -315,6 +327,7 @@ class BuildableAssemblyWaspReportGenerator:
         def on_error(e):
             if refresh_id != self._refresh_id:
                 return
+            cancel_refresh_timeout()
             error_message = str(e) if e else "Unknown error"
             pb.stop()
             popup.grab_release()
@@ -325,14 +338,28 @@ class BuildableAssemblyWaspReportGenerator:
             finish_refresh()
 
         def on_timeout():
+            nonlocal after_id
             if refresh_id != self._refresh_id:
                 return
+            after_id = None
             self._refresh_id += 1
-            pb.stop()
-            popup.grab_release()
-            pb.destroy()
-            label.config(text="Database refresh timed out.")
-            ttk.Button(popup, text="OK", command=popup.destroy).pack(pady=5)
+            try:
+                pb.stop()
+            except Exception:
+                pass
+            try:
+                popup.grab_release()
+            except Exception:
+                pass
+            try:
+                pb.destroy()
+            except Exception:
+                pass
+            try:
+                label.config(text="Database refresh timed out.")
+                ttk.Button(popup, text="OK", command=popup.destroy).pack(pady=5)
+            except Exception:
+                pass
             messagebox.showerror("Database refresh timed out", "The refresh took too long and was aborted. Please retry when the network is stable.")
             self._refresh_in_progress = False
             if hasattr(self, 'refresh_database_button'):
@@ -345,6 +372,8 @@ class BuildableAssemblyWaspReportGenerator:
             can_connect = False
 
         if not can_connect:
+            if after_id is not None:
+                cancel_refresh_timeout()
             pb.stop()
             popup.grab_release()
             pb.destroy()
@@ -353,7 +382,7 @@ class BuildableAssemblyWaspReportGenerator:
             finish_refresh()
             return
 
-        self.root.after(60000, on_timeout) # max time allowed for database refresh in milliseconds
+        after_id = self.root.after(60000, on_timeout) # max time allowed for database refresh in milliseconds
 
         # starts the multi-threaded database refresh
         threading.Thread(target=do_work, daemon=True).start()
@@ -524,10 +553,10 @@ if __name__ == "__main__":
 
     # setting font sizes across the UI
     style = ttkbootstrap.Style()
-    style.configure('TButton', font=('Segoe UI', 12))
-    style.configure('TLabel', font=('Segoe UI', 12))
-    style.configure('TCheckbutton', font=('Segoe UI', 12))
-    style.configure('TLabelframe.Label', font=('Segoe UI', 10))
+    style.configure('TButton', font=('Segoe UI', 14))
+    style.configure('TLabel', font=('Segoe UI', 14))
+    style.configure('TCheckbutton', font=('Segoe UI', 14))
+    style.configure('TLabelframe.Label', font=('Segoe UI', 12))
 
     app = BuildableAssemblyWaspReportGenerator(root)
 
