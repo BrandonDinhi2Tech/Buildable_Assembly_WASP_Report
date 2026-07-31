@@ -556,7 +556,7 @@ if __name__ == "__main__":
     style.configure('TButton', font=('Segoe UI', 14))
     style.configure('TLabel', font=('Segoe UI', 14))
     style.configure('TCheckbutton', font=('Segoe UI', 14))
-    style.configure('TLabelframe.Label', font=('Segoe UI', 12))
+    style.configure('TLabelframe.Label', font=('Segoe UI', 14))
 
     app = BuildableAssemblyWaspReportGenerator(root)
 
