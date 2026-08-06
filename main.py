@@ -405,7 +405,7 @@ class BuildableAssemblyWaspReportGenerator:
             pb.stop()
             popup.grab_release()
             pb.destroy()
-            label.config(text="Cannot reach WASP server.\nCheck if connected to i2Tech Inventory WiFi and retry.", justify='center', anchor='center')
+            label.config(text="Cannot reach WASP server.\nCheck if connected to i2Tech Inventory WiFi\n and retry.", justify='center', anchor='center')
             ttk.Button(popup, text="OK", command=popup.destroy).pack(pady=5)
             finish_refresh()
             return
