@@ -210,6 +210,34 @@ class BuildableAssemblyWaspReportGenerator:
         unit_search_terms = ["%" + term + "%" for term in unit_type.split()]
         return unit_search_terms
 
+    def _set_assembly_selection(self, selection):
+        if selection is None:
+            self.assembly_combobox.set('')
+            return
+
+        display_values = [
+            f"{a['waspnumber']} - {a['description']}"
+            for a in self.assembly_list
+        ]
+        self.assembly_combobox['values'] = display_values
+
+        if not display_values:
+            self.assembly_combobox.set('')
+            return
+
+        if selection in display_values:
+            self.assembly_combobox.set(selection)
+            return
+
+        for assembly in self.assembly_list:
+            if assembly['waspnumber'] == selection:
+                self.assembly_combobox.set(
+                    f"{assembly['waspnumber']} - {assembly['description']}"
+                )
+                return
+
+        self.assembly_combobox.current(0)
+
     # updates the assembly combobox whenever the unit combobox is selected
     def on_unit_type_changed(self, event=None):
         try:
@@ -523,7 +551,7 @@ class BuildableAssemblyWaspReportGenerator:
         p = self.preset_list[idx]
         self.unit_combobox.set(p['unit_type'])
         self.on_unit_type_changed() # update assembly combobox to match unit type
-        self.assembly_combobox.set(p['assembly_id'])
+        self._set_assembly_selection(p.get('assembly_id'))
         self.contract_combobox.set(p['contract'])
         self.include_inspection.set(p['include_inspection'])
         self.include_on_order.set(p['include_on_order'])
@@ -547,7 +575,7 @@ class BuildableAssemblyWaspReportGenerator:
             self.refresh_preset_list()
 
 if __name__ == "__main__":
-    root=ttkbootstrap.Window(themename="flatly")
+    root=ttkbootstrap.Window(themename="minty-light")
 
     presets.create_default_presets() # makes the default presets that every user will have on startup
 

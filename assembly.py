@@ -18,6 +18,14 @@ def assembly_api_call(assembly_number):
     response.raise_for_status()
     return response.json()
 
+def items_table_exists(conn) -> bool:
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT to_regclass('public.items') IS NOT NULL;")
+        return cursor.fetchone()[0]
+    finally:
+        cursor.close()
+
 # gets a list of all unique assembly numbers
 def get_all_assemblies(conn=None):
     if conn is None:
@@ -27,6 +35,9 @@ def get_all_assemblies(conn=None):
         close_after = False
 
     try:
+        if not items_table_exists(conn):
+            return []
+        
         cursor = conn.cursor()
         cursor.execute("""SELECT DISTINCT ON (WASPNumber) id
                             FROM items
@@ -36,6 +47,8 @@ def get_all_assemblies(conn=None):
         return [row[0] for row in cursor.fetchall()] # returns a list of all of the unique assemblies
     except Exception as e:
         print('Failed to get all assembly numbers', e)
+        conn.rollback()
+        return []
     finally:
         if close_after:
             conn.close()
@@ -49,6 +62,9 @@ def get_assy_wasp_and_desc(unit_type=None, conn=None):
         close_after = False
 
     try:
+        if not items_table_exists(conn):
+            return []
+
         cursor = conn.cursor()
         params = (
             ['8%', '9%', 'A%', 'B%', 'C%', 'X%'],
@@ -68,6 +84,10 @@ def get_assy_wasp_and_desc(unit_type=None, conn=None):
         ]
 
         return assembly_list
+    except Exception as e:
+        print('Failed to get assembly wasp numbers and descriptions', e)
+        conn.rollback()
+        return []
         
     finally:
         if close_after:
