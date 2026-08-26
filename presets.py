@@ -8,70 +8,72 @@ def get_specific_assembly_and_desc(assembly_id, assembly_list):
     for a in assembly_list:
         if a['waspnumber'] == assembly_id:
             return f"{a['waspnumber']} - {a['description']}"
+    return assembly_id
 
-assembly_list = get_assy_wasp_and_desc()
-DEFAULT_PRESETS = [
-    {
-        "name": "RGI35 Including Inspection, Kitted, Cost",\
-        "unit_type": 'i2AX(BLK2) 616-12',
-        "assembly_id": get_specific_assembly_and_desc('X61612', assembly_list),
-        "contract": "RGI35",
-        "include_inspection": True,
-        "include_on_order": False,
-        "include_kitted": True,
-        "include_assembled": False,
-        "include_cost" : True,
-        "desired_amount": None
-    },
-    {
-        "name": "RGI35 Major Parts Including Inspection, Kitted, Cost",
-        "unit_type": 'i2AX(BLK2) 616-12',
-        "assembly_id": get_specific_assembly_and_desc('A61612', assembly_list),
-        "contract": "RGI35", 
-        "include_inspection": True,
-        "include_on_order": False,
-        "include_kitted": True,
-        "include_assembled": False,
-        "include_cost": True,
-        "desired_amount": None
-    },
-    {
-        "name": "QIN11 Major Parts Including Inspection, Kitted, Cost",
-        "unit_type": 'i2DAS 910-02',
-        "assembly_id": get_specific_assembly_and_desc('A91002', assembly_list),
-        "contract": "QIN11", 
-        "include_inspection": True,
-        "include_on_order": False,
-        "include_kitted": True,
-        "include_assembled": False,
-        "include_cost": True,
-        "desired_amount": None
-    },
-    {
-        "name": "QIN11 Housing Including Inspection, Kitted, Cost",
-        "unit_type": 'i2DAS 910-02',
-        "assembly_id": get_specific_assembly_and_desc('C91002', assembly_list),
-        "contract": "QIN11", 
-        "include_inspection": True,
-        "include_on_order": False,
-        "include_kitted": True,
-        "include_assembled": False,
-        "include_cost": True,
-        "desired_amount": None
-    },
-    {
-        "name": "QIN11 Including Inspection, Kitted, Cost",
-        "unit_type": 'i2DAS 910-02',
-        "assembly_id": get_specific_assembly_and_desc('X91002', assembly_list),
-        "contract": "QIN11", 
-        "include_inspection": True,
-        "include_on_order": False,
-        "include_kitted": True,
-        "include_assembled": False,
-        "include_cost": True,
-        "desired_amount": None
-    }
-]
+def build_default_presets():
+    assembly_list = get_assy_wasp_and_desc()
+    return [
+        {
+            "name": "RGI35 Including Inspection, Kitted, Cost",\
+            "unit_type": 'i2AX(BLK2) 616-12',
+            "assembly_id": get_specific_assembly_and_desc('X61612', assembly_list),
+            "contract": "RGI35",
+            "include_inspection": True,
+            "include_on_order": False,
+            "include_kitted": True,
+            "include_assembled": False,
+            "include_cost" : True,
+            "desired_amount": None
+        },
+        {
+            "name": "RGI35 Major Parts Including Inspection, Kitted, Cost",
+            "unit_type": 'i2AX(BLK2) 616-12',
+            "assembly_id": get_specific_assembly_and_desc('A61612', assembly_list),
+            "contract": "RGI35", 
+            "include_inspection": True,
+            "include_on_order": False,
+            "include_kitted": True,
+            "include_assembled": False,
+            "include_cost": True,
+            "desired_amount": None
+        },
+        {
+            "name": "QIN11 Major Parts Including Inspection, Kitted, Cost",
+            "unit_type": 'i2DAS 910-02',
+            "assembly_id": get_specific_assembly_and_desc('A91002', assembly_list),
+            "contract": "QIN11", 
+            "include_inspection": True,
+            "include_on_order": False,
+            "include_kitted": True,
+            "include_assembled": False,
+            "include_cost": True,
+            "desired_amount": None
+        },
+        {
+            "name": "QIN11 Housing Including Inspection, Kitted, Cost",
+            "unit_type": 'i2DAS 910-02',
+            "assembly_id": get_specific_assembly_and_desc('C91002', assembly_list),
+            "contract": "QIN11", 
+            "include_inspection": True,
+            "include_on_order": False,
+            "include_kitted": True,
+            "include_assembled": False,
+            "include_cost": True,
+            "desired_amount": None
+        },
+        {
+            "name": "QIN11 Including Inspection, Kitted, Cost",
+            "unit_type": 'i2DAS 910-02',
+            "assembly_id": get_specific_assembly_and_desc('X91002', assembly_list),
+            "contract": "QIN11", 
+            "include_inspection": True,
+            "include_on_order": False,
+            "include_kitted": True,
+            "include_assembled": False,
+            "include_cost": True,
+            "desired_amount": None
+        }
+    ]
 
 def ensure_table(conn):
     cursor = conn.cursor()
@@ -179,7 +181,7 @@ def create_default_presets(conn=None):
     try:
         ensure_table(conn)
         cursor = conn.cursor()
-        for p in DEFAULT_PRESETS:
+        for p in build_default_presets():
             cursor.execute(
                 """INSERT INTO presets (
                     name, unit_type, assembly_id, contract, include_inspection, include_on_order,

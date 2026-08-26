@@ -3,7 +3,7 @@ import item
 import pandas as pd
 from datetime import datetime
 from openpyxl.formatting.rule import CellIsRule
-from openpyxl.styles import PatternFill
+from openpyxl.styles import PatternFill, Font
 from openpyxl.utils import get_column_letter
 import os
 
@@ -75,8 +75,8 @@ def build_report_query(
     if include_inspection:
         select_parts.append('COALESCE(inspection.totalavailable, 0) AS "Quantity Pending Inspection"')
 
-    if include_on_order:
-        select_parts.append('COALESCE(comp_master.onorder, 0) AS "Quantity on Order"')
+    # if include_on_order:
+    select_parts.append('COALESCE(comp_master.onorder, 0) AS "Quantity on Order"')
 
     if include_kitted:
         select_parts.append('COALESCE(kit.totalavailable, 0) AS "Quantity Kitted for Contract"')
@@ -218,8 +218,8 @@ def build_report_query(
     ]
 
     group_by_parts.append('assembled.totalavailable')
-    if include_on_order:
-        group_by_parts.append('comp_master.onorder')
+    # if include_on_order:
+    group_by_parts.append('comp_master.onorder')
     if include_inspection:
         group_by_parts.append('inspection.totalavailable')
     if include_kitted:
@@ -315,7 +315,7 @@ def build_output_filename(
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
 
     flags = " ".join(parts)
-    filename = f" {timestamp} " + flags + ".xlsx"
+    filename = f"{timestamp} " + flags + ".xlsx"
 
     return flags, filename
 
@@ -342,8 +342,8 @@ def create_report(
         conn = create_db_conn()
         cursor = conn.cursor()
 
-        # # Need to get all items in BOM for assembly, their quantities in the BOM, their cost, and the amount of each item available in the appropriate site
-        # # then need to write result to a spreadsheet (csv/xlsx)
+        # Need to get all items in BOM for assembly, their quantities in the BOM, their cost, and the amount of each item available in the appropriate site
+        # then need to write result to a spreadsheet (csv/xlsx)
         cursor.execute("""SELECT id 
                         FROM items 
                         WHERE WASPNumber = %s
@@ -375,7 +375,7 @@ def create_report(
         # if a preset is actually selected, then use it as the file name
         if preset_name:
             timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-            file_name = f" {timestamp} " + preset_name + ".xlsx"
+            file_name = f"{timestamp} " + preset_name + ".xlsx"
         
         # accounting for the user's chosen output directory
         if output_directory:
@@ -388,6 +388,14 @@ def create_report(
             df = pd.read_sql_query(get_report, conn, params=params)
         else:
             raise ValueError("Pick a valid contract.")
+
+        if desired_amount is not None and "Available-Desired Quantity" in df.columns:
+            df = (
+                df.assign(_shortfall=df["Available-Desired Quantity"].lt(0))
+                .sort_values(by="_shortfall", ascending=False, kind="mergesort")
+                .drop(columns=["_shortfall"])
+                .reset_index(drop=True)
+            )
 
         assembly_buildable = df["Buildable Amount"].min() #amount of the assembly that can be built
 
@@ -403,17 +411,141 @@ def create_report(
         # output sql query to excel spreadsheet
         with pd.ExcelWriter(full_path, engine="openpyxl") as writer:
             ws_title = writer.book.create_sheet(title="Title Page")
-            ws_title.cell(row=1, column=1, value=f"WASP Buildable Report {report_title_flags}")
-            ws_title.cell(row=2, column=1, value=f"BOM: {assembly_num}")
-            ws_title.cell(row=3, column=1, value=f"Desc: {assembly_description}")
-            ws_title.cell(row=4, column=1, value=f"Buildable Units: {assembly_buildable}")
+            title_cell = ws_title.cell(row=1, column=1, value=f"WASP Buildable Report {report_title_flags}")
+            title_cell.font = Font(name="Calibri", size = 14, bold = True)
 
+            assembly_num_cell = ws_title.cell(row=2, column=1, value=f"BOM: {assembly_num}")
+            assembly_num_cell.font = Font(name="Calibri", size=14)
+
+            assembly_desc_cell = ws_title.cell(row=3, column=1, value=f"Desc: {assembly_description}")
+            assembly_desc_cell.font = Font(name="Calibri", size=14)
+
+            buildable_units_cell = ws_title.cell(row=4, column=1, value=f"Buildable Units: {assembly_buildable}")
+            buildable_units_cell.font = Font(name="Calibri", size=72, bold=True)
+
+            # include cost of BOM if needed
             if include_cost:
-                ws_title.cell(row=5, column=1, value=f"Cost of BOM: ")
+                cost_label_cell = ws_title.cell(row=5, column=1, value=f"Cost per unit of BOM: ")
+                cost_label_cell.font = Font(name="Calibri", size=20, bold=True)
+
                 bom_cost_cell = ws_title.cell(row=5, column=2, value=assembly_cost)
                 bom_cost_cell.number_format = '"$"#,##0.00' # formatting bom cost into dollars
+                bom_cost_cell.font = Font(name="Calibri", size=20, bold=True)
 
-            ws_title.cell(row=1, column=2, value=f"Date: {datetime.now()}")
+            summary_start_row = 7 if include_cost else 6 # start of summary of short parts if needed
+
+            # add desired amount to title page if necessary
+            if desired_amount:
+                desired_amount_cell = ws_title.cell(row=summary_start_row, column=1, value = f"Desired Amount: {desired_amount}")
+                desired_amount_cell.font = Font(name="Calibri", size=20, bold = True)
+
+            # move available-desired quantity towards the left of the report so it's easier to see at a glance
+            if "Available-Desired Quantity" in df.columns:
+                shortfall_col = df.pop("Available-Desired Quantity")
+                insert_at = df.columns.get_loc("Quantity in BOM") + 1
+                df.insert(insert_at, "Available-Desired Quantity", shortfall_col)
+
+            short_red_color = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid") # use this color for indicating parts we're short on
+
+            # filling up shortfall_rows with rows that are short of desired quantity
+            shortfall_info = ["Component", "Component Description", "Available-Desired Quantity"] # columns of dataframe to pull info about shortfall from
+            if include_cost:
+                shortfall_info.append("Component Cost")
+            if not include_on_order:
+                shortfall_info.append("Quantity on Order")
+            if desired_amount is not None and "Available-Desired Quantity" in df.columns:
+                shortfall_rows = df.loc[df["Available-Desired Quantity"] < 0, shortfall_info]
+
+                # offsetting for the extra row that desired amount might have taken up
+                if desired_amount:
+                    summary_start_row += 1
+
+                if not shortfall_rows.empty:
+                    # title and headers for shortfall summary
+                    shortfall_title_cell = ws_title.cell(row=summary_start_row, column=1, value="Items required to build desired amount:")
+                    shortfall_title_cell.font = Font(name="Calibri", size=16, bold=True)
+
+                    shortfall_component_header = ws_title.cell(row=summary_start_row + 1, column=1, value="Component")
+                    shortfall_component_header.font = Font(name="Calibri", size=14, bold=True)
+
+                    shortfall_component_desc_header = ws_title.cell(row=summary_start_row + 1, column=2, value="Component Description")
+                    shortfall_component_desc_header.font = Font(name="Calibri", size=14, bold=True)
+
+                    shortfall_amount_header = ws_title.cell(row=summary_start_row + 1, column=3, value="Shortfall")
+                    shortfall_amount_header.font = Font(name="Calibri", size=14, bold=True)
+
+                    if include_cost:
+                        shortfall_cost_header = ws_title.cell(row=summary_start_row + 1, column=4, value="Component Cost")
+                        shortfall_cost_header.font = Font(name="Calibri", size=14, bold=True)
+
+                    if not include_on_order:
+                        shortfall_on_order_header = ws_title.cell(row=summary_start_row + 1, column=5, value="Quantity on Order")
+                        shortfall_on_order_header.font = Font(name="Calibri", size=14, bold=True)
+
+
+                    # printing out rows that were short of desired amount
+                    for offset, (_, row) in enumerate(shortfall_rows.iterrows(), start=2):
+                        shortfall_component_cell = ws_title.cell(
+                            row=summary_start_row + offset,
+                            column=1,
+                            value=row["Component"]
+                        )
+                        shortfall_component_cell.font = Font(name="Calibri", size=14)
+                        shortfall_component_cell.fill = short_red_color
+
+                        shortfall_component_desc_cell = ws_title.cell(
+                            row=summary_start_row + offset,
+                            column=2,
+                            value=row["Component Description"]
+                        )
+                        shortfall_component_desc_cell.font = Font(name="Calibri", size=14)
+                        shortfall_component_desc_cell.fill = short_red_color
+
+                        shortfall_amount_cell = ws_title.cell(
+                            row=summary_start_row + offset,
+                            column=3,
+                            value=row["Available-Desired Quantity"]
+                        )
+                        shortfall_amount_cell.font = Font(name="Calibri", size=14)
+                        shortfall_amount_cell.fill = short_red_color
+
+                        if include_cost:
+                            shortfall_cost_cell = ws_title.cell(
+                                row=summary_start_row+offset,
+                                column=4,
+                                value=row["Component Cost"]
+                            )
+                            shortfall_cost_cell.font=Font(name="Calibri", size=14)
+                            shortfall_cost_cell.fill = short_red_color
+                            shortfall_cost_cell.number_format = '"$"#,##0.00' # formatting shortfall cost into dollars
+
+                        if not include_on_order:
+                            shortfall_on_order_cell = ws_title.cell(
+                                row=summary_start_row+offset,
+                                column=5,
+                                value=row["Quantity on Order"]
+                            )
+                            shortfall_on_order_cell.font = Font(name="Calibri", size=14)
+                            # if on order quantity is less than what is needed to fulfill desired quantity, highlight in red
+                            if row["Quantity on Order"] < abs(row["Available-Desired Quantity"]):
+                                shortfall_on_order_cell.fill = short_red_color
+
+                    # display total cost of shortfall parts
+                    if include_cost:
+                        total_cost = (
+                            shortfall_rows["Available-Desired Quantity"].abs() *
+                            shortfall_rows["Component Cost"]
+                        ).sum()
+                        total_row = summary_start_row + len(shortfall_rows) + 2
+                        total_label_cell = ws_title.cell(row=total_row, column=3, value="Total Shortfall Cost:")
+                        total_label_cell.font = Font(name="Calibri", size=14, bold=True)
+                        total_value_cell = ws_title.cell(row=total_row, column=4, value=total_cost)
+                        total_value_cell.font = Font(name="Calibri", size=14, bold=True)
+                        total_value_cell.number_format = '"$"#,##0.00'
+
+            # add date of report creation to the top of the title page
+            date_cell = ws_title.cell(row=1, column=2, value=f"Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
+            date_cell.font = Font(name="Calibri", size=14)
             df.to_excel(writer, index=False, sheet_name="Report")
 
             # highlighting cells that are short in red
@@ -439,7 +571,7 @@ def create_report(
                     CellIsRule(
                         operator="lessThan",
                         formula=["0"],
-                        fill=PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid"),
+                        fill=short_red_color
                     )
                 )
             
@@ -471,6 +603,8 @@ def create_report(
 
         cursor.close()
         conn.close()
+
+        return full_path # for opening up the report automatically after generation
 
     except Exception as e:
         print('Failed to create report', e)

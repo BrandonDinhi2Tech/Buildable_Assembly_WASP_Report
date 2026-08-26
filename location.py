@@ -18,7 +18,8 @@ def location_api_call(location_search_term=None, site_search_term=None):
     'Content-Type': 'application/json'
     }
 
-    response = requests.request("POST", url, headers=headers, data=payload)
+    response = requests.request("POST", url, headers=headers, data=payload, timeout=15)
+    response.raise_for_status()
     return response.json()
 
 # make a location table with all of the locations in WASP, their sites, and their descriptions
@@ -70,4 +71,5 @@ def update_location_table():
 
     except Exception as e:
         print('Failed location table update', e)
+        raise
 
