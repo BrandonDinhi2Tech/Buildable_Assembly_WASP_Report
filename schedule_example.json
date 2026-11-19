@@ -1,0 +1,20 @@
+{
+  "groups": [
+    {
+      "name": "Example Build Reports",
+      "recipients": ["example@domain.xyz"],
+      "presets": [
+        "Example Build",
+        "Example Harness"
+      ]
+    },
+    {
+      "name": "Example Two Build Reports",
+      "recipients": ["example@domain.xyz", "example2@domain.xyz"],
+      "presets": [
+        "Example Two Build",
+        "Example Two Harness"
+      ]
+    }
+  ]
+}

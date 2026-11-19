@@ -12,3 +12,6 @@ Run this command in the install directory: pyinstaller --onedir --noconsole --co
 
 Make sure to have a .env file in the same directory as the .exe
 
+## Email Options
+- Setup schedule_example.json and rename to schedule.json
+- Run run_scheduled.py as you wish with the options listed in run_scheduled.py

@@ -70,7 +70,7 @@ def get_assy_wasp_and_desc(unit_type=None, conn=None):
 
         cursor = conn.cursor()
         params = (
-            ['8%', '9%', 'A%', 'B%', 'C%', 'X%'],
+            ['8%', '9%', 'A%', 'B%', 'C%', 'E%', 'X%'],
             unit_type if unit_type else ['%']
         )
         cursor.execute("""
